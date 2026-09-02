@@ -149,6 +149,15 @@ class TimestampSuite(TmpPathSuite):
 
     def write_mp4(self, path: Path) -> None:
         """Write a tiny real MP4 via imageio-ffmpeg (bundled with moviepy)."""
+        self._write_ffmpeg_media(path, "libx264", "mp4")
+
+    def write_mov(self, path: Path) -> None:
+        self._write_ffmpeg_media(path, "libx264", "mov")
+
+    def write_wmv(self, path: Path) -> None:
+        self._write_ffmpeg_media(path, "wmv2", "asf")
+
+    def _write_ffmpeg_media(self, path: Path, vcodec: str, fmt: str) -> None:
         import subprocess
 
         import imageio_ffmpeg
@@ -164,9 +173,11 @@ class TimestampSuite(TmpPathSuite):
                 "-i",
                 "color=c=black:s=64x64:d=0.1",
                 "-c:v",
-                "libx264",
+                vcodec,
                 "-pix_fmt",
                 "yuv420p",
+                "-f",
+                fmt,
                 str(path),
             ],
             check=True,

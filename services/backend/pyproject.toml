@@ -6,7 +6,7 @@ requires-python = ">=3.9"
 # Runtime / publish group (formerly requirements/publish.txt).
 # Install with: uv sync
 dependencies = [
-    "gp_wrapper>=0.9.11",
+    "gp_wrapper>=0.9.12",
     "beautifulsoup4",
     "tqdm",
     "fastapi",
@@ -48,7 +48,7 @@ packages = ["src", "src.export", "src.jobs", "src.jobs.persistence", "src.api", 
 
 # default-groups = [] so `uv sync` is runtime/publish only.
 # `uv sync --group dev` adds mypy/pylint/stubs. `uv sync --all-groups` is equivalent here.
-# gp_wrapper 0.9.11+ imports moviepy.editor (removed in moviepy 2.x).
+# gp_wrapper 0.9.12+ imports moviepy.editor (removed in moviepy 2.x).
 [tool.uv]
 default-groups = []
 constraint-dependencies = [

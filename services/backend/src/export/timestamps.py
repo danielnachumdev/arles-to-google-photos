@@ -15,7 +15,6 @@ from .media_kinds import is_video_filename
 from .preview import PreviewItem
 
 _JPEG_SUFFIXES = {".jpg", ".jpeg", ".jpe"}
-_MP4_CONTAINER_SUFFIXES = {".mp4", ".m4v", ".mov"}
 _EXIF_FMT = "%Y:%m:%d %H:%M:%S"
 _MP4_CREATION_FMT = "%Y-%m-%dT%H:%M:%S.000000Z"
 
@@ -137,9 +136,10 @@ class CaptureTimestampStamper:
     ) -> None:
         """Embed creation_time in the MP4 bytes Google Photos actually uploads.
 
-        Filesystem mtime is not part of the upload payload. For non-MP4 sources,
-        ``gp_wrapper`` uploads ``{stem}.mp4`` when present — prepare that companion
-        (from play_relpath when available) and stamp its container metadata.
+        Filesystem mtime is not part of the upload payload. ``gp_wrapper`` converts
+        non-MP4 videos (``.mov`` / ``.wmv``) to ``{stem}.mp4`` at upload time when
+        that companion is missing — and moviepy's new file gets *today* as
+        creation_time. Prepare (or reuse) that companion here and stamp it.
         """
         target = self._video_metadata_target(path, root=root, item=item)
         if target is None:
@@ -158,10 +158,10 @@ class CaptureTimestampStamper:
         root: Path,
         item: PreviewItem,
     ) -> Optional[Path]:
-        if path.suffix.lower() in _MP4_CONTAINER_SUFFIXES:
+        if path.suffix.lower() == ".mp4":
             return path
         companion = path.with_suffix(".mp4")
-        if companion.is_file():
+        if companion.is_file() and companion.stat().st_size > 0:
             return companion
         play = item.play_relpath
         if play:
@@ -172,7 +172,74 @@ class CaptureTimestampStamper:
                 except OSError:
                     return None
                 return companion
+        if self._transcode_to_mp4(path, companion):
+            return companion
         return None
+
+    def _transcode_to_mp4(self, source: Path, dest: Path) -> bool:
+        """Create the ``.mp4`` companion ``gp_wrapper.upload_media`` will prefer."""
+        try:
+            import imageio_ffmpeg
+        except ImportError:
+            return False
+        try:
+            ffmpeg = imageio_ffmpeg.get_ffmpeg_exe()
+        except Exception:
+            return False
+        parent = dest.parent
+        tmp_path: Optional[Path] = None
+        try:
+            with tempfile.NamedTemporaryFile(
+                prefix=f".{dest.stem}_xcode_",
+                suffix=".mp4",
+                dir=str(parent),
+                delete=False,
+            ) as handle:
+                tmp_path = Path(handle.name)
+            # Prefer remux when the container allows it (typical for MOV→MP4).
+            for args in (
+                [
+                    ffmpeg,
+                    "-y",
+                    "-i",
+                    str(source),
+                    "-c",
+                    "copy",
+                    "-movflags",
+                    "+faststart",
+                    str(tmp_path),
+                ],
+                [
+                    ffmpeg,
+                    "-y",
+                    "-i",
+                    str(source),
+                    "-c:v",
+                    "libx264",
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-c:a",
+                    "aac",
+                    "-movflags",
+                    "+faststart",
+                    str(tmp_path),
+                ],
+            ):
+                result = subprocess.run(
+                    args,
+                    check=False,
+                    capture_output=True,
+                )
+                if result.returncode == 0 and tmp_path.is_file() and tmp_path.stat().st_size > 0:
+                    tmp_path.replace(dest)
+                    return True
+            if tmp_path is not None:
+                tmp_path.unlink(missing_ok=True)
+            return False
+        except Exception:
+            if tmp_path is not None:
+                tmp_path.unlink(missing_ok=True)
+            return False
 
     def _embed_mp4_creation_time(self, path: Path, stamp: datetime) -> bool:
         try:

@@ -124,6 +124,56 @@ class TestCaptureTimestampStamper(TimestampSuite):
         assert self.mp4_creation_time(companion) == datetime(2012, 8, 2, 0, 0, 0)
         assert abs((self.mtime(wmv) - datetime(2012, 8, 2, 0, 0, 0)).total_seconds()) <= 2
 
+    def test_stamp_wmv_without_play_sidecar_still_builds_upload_mp4(self) -> None:
+        """gp_wrapper converts WMV→MP4 at upload; that file must exist with creation_time."""
+        wmv = self.tmp_path / "hrimages" / "clip01hr.wmv"
+        wmv.parent.mkdir(parents=True, exist_ok=True)
+        # Real tiny WMV via ffmpeg so transcode has a decodeable source.
+        self.write_wmv(wmv)
+
+        self.stamper.stamp_upload(
+            self.tmp_path,
+            [
+                PreviewItem(
+                    id="clip01",
+                    relpath="hrimages/clip01hr.wmv",
+                    caption="",
+                    size_bytes=wmv.stat().st_size,
+                    taken_on=date(2012, 8, 2),
+                    kind="video",
+                ),
+            ],
+        )
+
+        companion = self.tmp_path / "hrimages" / "clip01hr.mp4"
+        assert companion.is_file()
+        assert self.mp4_creation_time(companion) == datetime(2012, 8, 2, 0, 0, 0)
+
+    def test_stamp_mov_builds_companion_mp4_not_only_source(self) -> None:
+        """gp_wrapper also converts MOV→MP4; stamping only the .mov leaves today on Photos."""
+        mov = self.tmp_path / "hrimages" / "clip01hr.MOV"
+        mov.parent.mkdir(parents=True, exist_ok=True)
+        self.write_mov(mov)
+
+        self.stamper.stamp_upload(
+            self.tmp_path,
+            [
+                PreviewItem(
+                    id="clip01",
+                    relpath="hrimages/clip01hr.MOV",
+                    caption="",
+                    size_bytes=mov.stat().st_size,
+                    taken_on=date(2011, 4, 18),
+                    kind="video",
+                ),
+            ],
+        )
+
+        companion = self.tmp_path / "hrimages" / "clip01hr.mp4"
+        assert companion.is_file()
+        assert self.mp4_creation_time(companion) == datetime(2011, 4, 18, 0, 0, 0)
+        assert abs((self.mtime(mov) - datetime(2011, 4, 18, 0, 0, 0)).total_seconds()) <= 2
+
     def test_stamp_without_exif_uses_taken_on_plus_gallery_index(self) -> None:
         first = self.tmp_path / "hrimages" / "20120802_01hr.JPG"
         second = self.tmp_path / "hrimages" / "20120802_02hr.JPG"
