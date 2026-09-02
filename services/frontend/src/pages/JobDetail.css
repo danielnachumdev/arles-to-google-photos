@@ -1,0 +1,291 @@
+.job-detail {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  font-family: var(--font-ui);
+}
+
+.job-detail__stage {
+  padding-block: 1.15rem 1.25rem;
+  padding-inline: 1.15rem;
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-lamp);
+  font-family: var(--font-ui);
+}
+
+.job-detail__heading {
+  margin: 0;
+  margin-block-end: 0.85rem;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  color: var(--color-ink);
+  text-align: start;
+}
+
+.job-detail__status-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.job-detail__cancel,
+.job-list__cancel {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-magenta);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--color-magenta) 40%, var(--color-print));
+  border-radius: var(--radius-print);
+  padding-block: 0.2rem;
+  padding-inline: 0.5rem;
+  cursor: pointer;
+}
+
+.job-detail__cancel:disabled,
+.job-list__cancel:disabled,
+.job-detail__restart:disabled,
+.job-list__restart:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.job-detail__restart,
+.job-list__restart {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-cyan);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--color-cyan) 40%, var(--color-print));
+  border-radius: var(--radius-print);
+  padding-block: 0.2rem;
+  padding-inline: 0.5rem;
+  cursor: pointer;
+}
+
+.job-detail__type-label {
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.job-detail__fields {
+  display: grid;
+  gap: 0.45rem 1rem;
+  margin: 0;
+  text-align: start;
+}
+
+.job-detail__row {
+  display: grid;
+  grid-template-columns: minmax(5rem, 8rem) minmax(0, 1fr);
+  gap: 0.35rem 0.75rem;
+  align-items: baseline;
+}
+
+.job-detail__key {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  color: var(--color-rail);
+  font-size: 0.88rem;
+}
+
+.job-detail__value {
+  margin: 0;
+  font-family: var(--font-ui);
+  color: var(--color-ink);
+  word-break: break-word;
+}
+
+.job-detail__id {
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+.job-detail__number,
+.job-detail__child-number {
+  font-variant-numeric: tabular-nums;
+}
+
+.job-detail__child-number {
+  font-family: var(--font-ui);
+  font-weight: 600;
+  color: var(--color-rail);
+}
+
+.job-detail__error {
+  color: var(--color-magenta);
+}
+
+.job-detail__warnings {
+  margin: 0;
+  padding-inline-start: 1.1rem;
+  color: var(--color-warn);
+}
+
+.job-detail__link {
+  color: var(--color-cyan);
+  font-family: var(--font-ui);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.job-detail__link:hover {
+  color: var(--color-ink);
+}
+
+.job-detail__loading,
+.job-detail__empty {
+  margin: 0;
+  font-family: var(--font-ui);
+  color: var(--color-rail);
+  text-align: start;
+}
+
+.job-detail__alert {
+  margin: 0;
+  margin-block-end: 0.75rem;
+  padding-block: 0.55rem;
+  padding-inline: 0.7rem;
+  font-family: var(--font-ui);
+  color: var(--color-magenta);
+  background: color-mix(in srgb, var(--color-magenta) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--color-magenta) 28%, var(--surface));
+  border-radius: var(--radius-print);
+  text-align: start;
+}
+
+.job-detail__log-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  margin-block-end: 0.85rem;
+}
+
+.job-detail__log-header .job-detail__heading {
+  margin-block-end: 0;
+}
+
+.job-detail__tech-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  color: var(--color-rail);
+  cursor: pointer;
+}
+
+.job-detail__log {
+  list-style: none;
+  margin: 0;
+  padding: 0.55rem 0.65rem;
+  display: grid;
+  grid-template-columns: auto minmax(3.5rem, auto) minmax(0, 1fr) auto;
+  column-gap: 0.75rem;
+  row-gap: 0.2rem;
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  line-height: 1.45;
+  background: color-mix(in srgb, var(--canvas) 70%, var(--surface));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-print);
+  overflow-x: auto;
+  text-align: start;
+}
+
+.job-detail__log-line {
+  display: grid;
+  grid-column: 1 / -1;
+  grid-template-columns: subgrid;
+  align-items: baseline;
+  color: var(--color-ink);
+}
+
+.job-detail__log-line--error,
+.job-detail__log-line--cancelled {
+  color: var(--color-magenta);
+}
+
+.job-detail__log-line--ops {
+  color: var(--color-rail);
+}
+
+.job-detail__log-time,
+.job-detail__log-progress {
+  font-variant-numeric: tabular-nums;
+  color: var(--color-rail);
+  white-space: nowrap;
+}
+
+.job-detail__log-line--error .job-detail__log-time,
+.job-detail__log-line--error .job-detail__log-progress,
+.job-detail__log-line--cancelled .job-detail__log-time,
+.job-detail__log-line--cancelled .job-detail__log-progress {
+  color: inherit;
+}
+
+.job-detail__log-message {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.job-detail__eta {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--color-cyan);
+  white-space: nowrap;
+}
+
+.job-detail__headers {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+
+.job-detail__children {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.job-detail__child {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.7rem;
+  padding-block: 0.5rem;
+  padding-inline: 0.65rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  text-align: start;
+}
+
+.job-detail__child-id {
+  font-family: var(--font-mono);
+  font-size: 0.88rem;
+}
+
+.job-detail__child-title {
+  font-family: var(--font-ui);
+  color: var(--color-ink);
+}

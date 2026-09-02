@@ -1,0 +1,50 @@
+# Arles Migrator – FastAPI backend + nginx frontend
+#
+# UI:      http://localhost:5173
+# API:     http://localhost:8000/api/...  (also proxied via nginx /api)
+#
+# Ingest, preview, and publish work in Docker. Google sign-in runs in the
+# browser (Web OAuth client); mount client_secrets.json so the UI can load
+# the client id from GET /api/auth/config.
+#
+# Secrets: mount host ./client_secrets.json (optional, read-only). Never baked into images.
+#   Host file must exist before `compose up`, or comment out that volume.
+#   Cloud Run: set GOOGLE_OAUTH_CLIENT_ID and/or GOOGLE_OAUTH_CLIENT_SECRETS /
+#   GOOGLE_CLIENT_SECRETS_JSON (Secret Manager); no file required. Blank env → file.
+
+services:
+  backend:
+    build: ./services/backend
+    working_dir: /app
+    ports:
+      - "8000:8000"
+    environment:
+      PYTHONUNBUFFERED: "1"
+      JOBS_ROOT: /app/data/jobs
+      # APP_ENV selects backends (not bucket presence). Unset/blank → cloud.
+      # local (aliases: dev, development) → FsArtifactStore + local sqlite on jobs-data.
+      # cloud (aliases: prod, production) → GCS_BUCKET required; DATABASE_URL optional.
+      APP_ENV: local
+      # Blank DATABASE_URL → local sqlite at {JOBS_ROOT}/migrator.sqlite
+      # Set DATABASE_URL (or SQLALCHEMY_DATABASE_URL) → SQLAlchemy remote (Postgres / Cloud SQL)
+      # gs:// / gcs:// DATABASE_URL is rejected (sqlite cannot open GCS).
+      # Cloud Run: omit APP_ENV or set cloud; GCS_BUCKET=name or gs://bucket/prefix (optional GCS_PREFIX)
+      # Cloud + blank DATABASE_URL → also mirror migrator.sqlite to {prefix}/migrator.sqlite
+      # (DELETE journal; one instance only). Prefer Cloud SQL if max instances > 1.
+      # Auth: ADC / GOOGLE_APPLICATION_CREDENTIALS.
+    volumes:
+      # Web OAuth client JSON (client_id for GET /api/auth/config). Optional; comment out if unused.
+      - ./client_secrets.json:/app/client_secrets.json:ro
+      # Uploaded albums + job state (migrator.sqlite). Survives container recreate.
+      - jobs-data:/app/data/jobs
+    command: ["uvicorn", "src.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
+
+  frontend:
+    build: ./services/frontend
+    ports:
+      - "5173:80" # http://localhost:5173
+    depends_on:
+      - backend
+
+volumes:
+  jobs-data: # durable artifacts + local sqlite state across recreates

@@ -1,0 +1,87 @@
+.import-mode {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+  margin-block-end: 0.85rem;
+  padding: 0.2rem;
+  width: fit-content;
+  max-width: 100%;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--canvas) 80%, var(--surface));
+  border: 1px solid var(--line);
+}
+
+.import-mode__choice {
+  padding-block: 0.4rem;
+  padding-inline: 0.85rem;
+  border-radius: 999px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: var(--mist);
+  font-family: var(--font-ui);
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.import-mode__choice:hover {
+  color: var(--ink);
+}
+
+.import-mode__choice--active {
+  color: #fff;
+  background: var(--iris);
+  border-color: var(--iris);
+}
+
+.import-mode__choice--active:hover {
+  color: #fff;
+  background: var(--iris-deep);
+}
+
+.web-import {
+  display: flex;
+  flex-direction: column;
+  gap: 0.85rem;
+  align-items: stretch;
+  text-align: start;
+}
+
+.web-import .workbench__button {
+  align-self: start;
+}
+
+.web-import__cache {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  text-align: start;
+  cursor: pointer;
+}
+
+.web-import__cache-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+}
+
+.web-import__cache input,
+.import-desk__auto input {
+  accent-color: var(--iris);
+}
+
+.import-desk__auto {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  margin-block-end: 0.85rem;
+  text-align: start;
+}
+
+.import-desk__auto-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  cursor: pointer;
+}

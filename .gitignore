@@ -1,0 +1,37 @@
+# Monorepo / root-only ignores.
+# Per-service: services/backend/.gitignore, services/frontend/.gitignore
+
+# Local album export folders (gitignored). Not mounted into Docker;
+# the UI uploads the picked folder. Compose only mounts client_secrets.json + jobs-data.
+data/
+
+# Secrets (OAuth client_secrets.json may live at repo root for compose)
+*client_secret*
+.env
+.pypirc
+
+# Virtualenvs at repo root
+.venv
+venv/
+env/
+
+# IDE / editor
+.idea/
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/extensions.json
+!.vscode/*.code-snippets
+
+# Local History for Visual Studio Code
+.history/
+
+# Built Visual Studio Code Extensions
+*.vsix
+
+# Node / frontend (services/frontend)
+# Nested services/frontend/.gitignore is also present; keep root coverage too.
+**/node_modules/
+**/dist/
+**/dist-ssr/
+*.local

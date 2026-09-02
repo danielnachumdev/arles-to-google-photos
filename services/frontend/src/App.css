@@ -1,0 +1,83 @@
+.app-room {
+  position: relative;
+  isolation: isolate;
+  min-height: 100vh;
+  overflow-x: clip;
+}
+
+.app-room::before,
+.app-room::after {
+  content: "";
+  position: fixed;
+  z-index: -1;
+  pointer-events: none;
+  border-radius: 50%;
+  filter: blur(48px);
+  opacity: 0.7;
+}
+
+.app-room::before {
+  inset-inline-start: -8rem;
+  inset-block-start: -6rem;
+  width: 28rem;
+  height: 28rem;
+  background: radial-gradient(circle, color-mix(in srgb, var(--iris) 42%, var(--surface)), transparent 68%);
+  animation: drift-a 22s var(--ease) infinite;
+}
+
+.app-room::after {
+  inset-inline-end: -10rem;
+  inset-block-end: -8rem;
+  width: 32rem;
+  height: 32rem;
+  background: radial-gradient(circle, color-mix(in srgb, #7ad0ff 38%, var(--surface)), transparent 70%);
+  animation: drift-b 28s var(--ease) infinite;
+}
+
+html[data-color-scheme="dark"] .app-room::before,
+html[data-color-scheme="dark"] .app-room::after {
+  opacity: 0.38;
+}
+
+.app {
+  position: relative;
+  max-width: 86rem;
+  margin-inline: auto;
+  padding-block: 1.25rem 2.5rem;
+  padding-inline: 1.15rem;
+  animation: rise 0.6s var(--ease) both;
+}
+
+.app__lede {
+  margin: 0;
+  color: var(--mist);
+  font-size: 0.98rem;
+  max-width: 38rem;
+}
+
+.app__home-link,
+.app__crumb {
+  margin: 0;
+  margin-block-start: 0.45rem;
+  margin-block-end: 1.1rem;
+  font-size: 0.92rem;
+}
+
+.app__home-link a,
+.app__crumb a {
+  color: var(--iris-deep);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.app__home-link a:hover,
+.app__crumb a:hover {
+  color: var(--ink);
+}
+
+@media (min-width: 720px) {
+  .app {
+    padding-block: 1.75rem 3rem;
+    padding-inline: 1.65rem;
+  }
+}

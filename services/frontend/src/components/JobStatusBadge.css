@@ -1,0 +1,47 @@
+.job-list__status {
+  display: inline-flex;
+  align-items: center;
+  font-family: var(--font-ui);
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
+.job-list__status--done {
+  color: var(--color-ok);
+}
+
+.job-list__status--pending {
+  color: var(--color-rail);
+}
+
+.job-list__status--failed {
+  color: var(--color-magenta);
+}
+
+.job-list__status--cancelled {
+  color: var(--color-rail);
+  opacity: 0.85;
+}
+
+.job-list__status--running {
+  color: var(--iris-deep);
+  animation: job-list-pulse 1.2s ease-in-out infinite;
+}
+
+.job-list__status--waiting {
+  color: var(--color-warn);
+  animation: job-list-pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes job-list-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .job-list__status--running,
+  .job-list__status--waiting {
+    animation: none;
+  }
+}

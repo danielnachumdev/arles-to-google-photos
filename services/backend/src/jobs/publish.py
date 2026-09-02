@@ -1,0 +1,210 @@
+"""Publish a preview job to Google Photos as a new independent upload job."""
+from __future__ import annotations
+
+from pathlib import Path
+from typing import Any, Callable, Optional, Protocol
+
+from ..export.preview import AlbumPreview
+from ..progress import JobCancelled
+from .cancel import cancellable_sink, store_is_cancelled
+from .events import JobEventBus
+from .store import (
+    STATUS_CANCELLED,
+    STATUS_FAILED,
+    STATUS_PENDING,
+    STATUS_RUNNING,
+    TYPE_UPLOAD,
+    JobNotFoundError,
+)
+
+
+class _JobLike(Protocol):
+    id: str
+    root: Path
+    status: str
+    type: str
+    preview: Optional[AlbumPreview]
+
+
+class _StoreLike(Protocol):
+    def get(self, job_id: str) -> _JobLike:
+        ...
+
+    def ensure_local_root(self, job_id: str) -> Path:
+        ...
+
+    def create_upload_from(
+        self,
+        source_id: str,
+        *,
+        parent_job_id: Optional[str] = None,
+    ) -> _JobLike:
+        ...
+
+    def set_status(
+        self,
+        job_id: str,
+        status: str,
+        error: Optional[str] = None,
+        *,
+        job_type: Optional[str] = None,
+    ) -> Any:
+        ...
+
+    def mark_done(self, job_id: str, product_url: str) -> Any:
+        ...
+
+
+class _PublisherLike(Protocol):
+    def publish(self, gp: Any, root: Path, preview: AlbumPreview, sink: Any = None) -> Any:
+        ...
+
+
+class PublishService:
+    """Create a new upload job, run AlbumPublisher, and emit SSE on that job."""
+
+    def __init__(
+        self,
+        store: _StoreLike,
+        publisher: _PublisherLike,
+        events: JobEventBus,
+        gp_factory: Callable[[str], Any],
+        submit: Optional[Callable[[str, Callable[[], None]], None]] = None,
+    ) -> None:
+        self._store = store
+        self._publisher = publisher
+        self._events = events
+        self._gp_factory = gp_factory
+        self._submit = submit
+
+    def publish(self, job_id: str, *, access_token: str) -> str:
+        upload_id = self.start(job_id, access_token=access_token)
+        self.finish(upload_id, access_token=access_token)
+        return upload_id
+
+    def launch(
+        self,
+        source_id: str,
+        *,
+        access_token: str,
+        parent_job_id: Optional[str] = None,
+    ) -> str:
+        """Start upload as pending and enqueue finish. Returns the upload id."""
+        upload_id = self.start(
+            source_id, access_token=access_token, parent_job_id=parent_job_id
+        )
+        token = access_token
+        if self._submit is not None:
+            self._submit(
+                upload_id, lambda: self._finish_safe(upload_id, token)
+            )
+        else:
+            self._finish_safe(upload_id, token)
+        return upload_id
+
+    def start(
+        self,
+        source_id: str,
+        *,
+        access_token: str,
+        parent_job_id: Optional[str] = None,
+    ) -> str:
+        try:
+            job = self._store.get(source_id)
+        except JobNotFoundError:
+            raise
+        if job.preview is None:
+            raise ValueError("preview not ready")
+        if job.type == TYPE_UPLOAD and job.status == STATUS_RUNNING:
+            raise ValueError("publish already in progress")
+        if not job.preview.items:
+            raise ValueError("no items to publish")
+
+        token = (access_token or "").strip()
+        if not token:
+            raise ValueError("google access token required")
+
+        if parent_job_id:
+            upload = self._store.create_upload_from(
+                source_id, parent_job_id=parent_job_id
+            )
+        else:
+            upload = self._store.create_upload_from(source_id)
+        total = len(upload.preview.items) if upload.preview is not None else 0
+        self._events.emit(
+            upload.id,
+            "publish",
+            "Starting upload",
+            current=0,
+            total=total,
+        )
+        if parent_job_id:
+            self._events.emit(
+                parent_job_id,
+                "child",
+                upload.id,
+                extra={"child_id": upload.id, "type": TYPE_UPLOAD},
+            )
+        return upload.id
+
+    def _finish_safe(self, upload_id: str, access_token: str) -> None:
+        try:
+            self.finish(upload_id, access_token=access_token)
+        except Exception:
+            return
+
+    def finish(self, upload_id: str, *, access_token: str) -> str:
+        job = self._store.get(upload_id)
+        if job.preview is None:
+            raise ValueError("preview not ready")
+        if not job.preview.items:
+            raise ValueError("no items to publish")
+        if job.status == STATUS_PENDING:
+            self._store.set_status(upload_id, STATUS_RUNNING, job_type=TYPE_UPLOAD)
+
+        total = len(job.preview.items)
+        try:
+            if store_is_cancelled(self._store, upload_id):
+                raise JobCancelled()
+            gp = self._gp_factory((access_token or "").strip())
+            album_root = self._store.ensure_local_root(upload_id)
+            album = self._publisher.publish(
+                gp,
+                album_root,
+                job.preview,
+                sink=cancellable_sink(
+                    self._events.sink_for(upload_id), self._store, upload_id
+                ),
+            )
+            if store_is_cancelled(self._store, upload_id):
+                raise JobCancelled()
+            url = getattr(album, "productUrl", "") or ""
+            self._store.mark_done(upload_id, url)
+            self._events.emit(
+                upload_id,
+                "done",
+                url,
+                current=total,
+                total=total,
+                extra={"product_url": url},
+            )
+            return url
+        except JobCancelled:
+            self._mark_cancelled(upload_id)
+            return ""
+        except Exception as exc:
+            if store_is_cancelled(self._store, upload_id):
+                self._mark_cancelled(upload_id)
+                return ""
+            self._store.set_status(
+                upload_id, STATUS_FAILED, error=str(exc), job_type=TYPE_UPLOAD
+            )
+            self._events.emit(upload_id, "error", str(exc))
+            raise
+
+    def _mark_cancelled(self, upload_id: str) -> None:
+        job = self._store.get(upload_id)
+        if getattr(job, "status", None) == STATUS_CANCELLED:
+            return
+        self._store.set_status(upload_id, STATUS_CANCELLED, job_type=TYPE_UPLOAD)
+        self._events.emit(upload_id, "cancelled", "Job cancelled")

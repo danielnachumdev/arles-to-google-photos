@@ -1,0 +1,11 @@
+__pycache__
+.venv
+venv
+*.pyc
+client_secrets.json
+data/
+.mypy_cache
+.pytest_cache
+.pylintrc
+mypy.ini
+

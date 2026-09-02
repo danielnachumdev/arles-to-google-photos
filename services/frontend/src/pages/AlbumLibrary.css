@@ -1,0 +1,209 @@
+.album-library {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.album-library__stage {
+  padding-block: 1.15rem 1.25rem;
+  padding-inline: 1.15rem;
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-lamp);
+}
+
+.album-library__heading {
+  margin: 0;
+  margin-block-end: 0.35rem;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  color: var(--color-ink);
+  text-align: start;
+}
+
+.album-library__lede {
+  margin: 0;
+  margin-block-end: 0.85rem;
+  color: var(--color-rail);
+  font-size: 0.92rem;
+  text-align: start;
+}
+
+.album-library__search-label {
+  display: block;
+  font-weight: 600;
+  margin: 0;
+  margin-block-end: 0.9rem;
+  text-align: start;
+}
+
+.album-library__search {
+  display: block;
+  width: 100%;
+  max-width: 28rem;
+  margin: 0;
+  margin-block-start: 0.35rem;
+  padding-block: 0.45rem;
+  padding-inline: 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--color-rail) 35%, var(--color-print));
+  border-radius: var(--radius-print);
+  background: var(--surface);
+  color: var(--color-ink);
+  font-family: var(--font-ui);
+  font-size: 1rem;
+  text-align: start;
+}
+
+.album-library__empty {
+  margin: 0;
+  color: var(--color-rail);
+  font-size: 0.92rem;
+  text-align: start;
+}
+
+.album-library__error {
+  margin: 0;
+  margin-block-end: 0.75rem;
+  padding-block: 0.55rem;
+  padding-inline: 0.7rem;
+  color: var(--color-magenta);
+  background: color-mix(in srgb, var(--color-magenta) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--color-magenta) 28%, var(--surface));
+  border-radius: var(--radius-print);
+  text-align: start;
+}
+
+.library-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.55rem;
+}
+
+.library-item {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 0.2rem;
+  padding-block: 0.7rem;
+  padding-inline: 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: var(--surface);
+  box-shadow: 0 8px 20px rgba(18, 21, 28, 0.04);
+  transition:
+    transform 0.28s var(--ease),
+    box-shadow 0.28s var(--ease),
+    border-color 0.28s var(--ease);
+}
+
+.library-item:hover {
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--iris) 28%, var(--line));
+  box-shadow: 0 16px 32px rgba(91, 108, 255, 0.1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .library-item:hover {
+    transform: none;
+  }
+}
+
+.library-item__head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.45rem 0.75rem;
+}
+
+.library-item__open {
+  flex: 1 1 14rem;
+  min-width: 0;
+  color: inherit;
+  text-decoration: none;
+  text-align: start;
+}
+
+.library-item:hover .library-item__title,
+.library-item__open:hover .library-item__title {
+  color: var(--color-cyan);
+}
+
+.library-item__title {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--color-ink);
+  word-break: break-word;
+}
+
+.library-item__meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.7rem;
+  font-size: 0.85rem;
+  color: var(--color-rail);
+  text-align: start;
+}
+
+.library-item__folder {
+  font-weight: 500;
+}
+
+.library-item__status {
+  padding-block: 0.05rem;
+  padding-inline: 0.4rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-cyan) 12%, var(--color-print));
+  color: var(--color-cyan);
+}
+
+.library-item__actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.45rem 0.75rem;
+}
+
+.library-item__job,
+.library-item__photos {
+  font-size: 0.88rem;
+  font-weight: 600;
+  color: var(--color-cyan);
+  white-space: nowrap;
+  text-decoration: none;
+}
+
+.library-item__job:hover,
+.library-item__photos:hover {
+  color: var(--color-ink);
+}
+
+.library-item__delete {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--color-magenta);
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+  text-align: start;
+}
+
+.library-item__delete:hover:not(:disabled) {
+  color: var(--color-ink);
+}
+
+.library-item__delete:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}

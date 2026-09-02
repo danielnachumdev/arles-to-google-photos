@@ -1,0 +1,462 @@
+.workbench {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+}
+
+.workbench--preview {
+  padding-block-end: 0.5rem;
+}
+
+.workbench__stage {
+  padding-block: 1.15rem 1.25rem;
+  padding-inline: 1.15rem;
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-lamp);
+}
+
+.workbench__stage-title {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.45rem 0.75rem;
+  margin: 0;
+  margin-block-end: 0.85rem;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  color: var(--color-ink);
+  text-align: start;
+}
+
+.workbench__flag {
+  font-weight: 500;
+  font-size: 0.88rem;
+  padding-block: 0.1rem;
+  padding-inline: 0.45rem;
+  border: 1px solid color-mix(in srgb, var(--color-cyan) 35%, var(--color-print));
+  border-radius: 999px;
+  color: var(--color-cyan);
+}
+
+.folder-pick {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  align-items: stretch;
+}
+
+.folder-pick__face {
+  flex: 1 1 16rem;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.15rem;
+  min-height: 3.1rem;
+  padding-block: 0.55rem;
+  padding-inline: 0.8rem;
+  border: 1px dashed color-mix(in srgb, var(--iris) 40%, var(--line));
+  border-radius: var(--radius-panel);
+  background: color-mix(in srgb, var(--iris) 8%, var(--surface));
+  cursor: pointer;
+  text-align: start;
+}
+
+.folder-pick:focus-within .folder-pick__face {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+.folder-pick__name {
+  font-weight: 600;
+  color: var(--color-ink);
+  word-break: break-word;
+}
+
+.folder-pick__meta {
+  font-size: 0.85rem;
+  color: var(--color-rail);
+}
+
+.workbench__invite {
+  margin: 0;
+  margin-block-start: 0.65rem;
+  color: var(--color-rail);
+  font-size: 0.92rem;
+  text-align: start;
+}
+
+.workbench__field {
+  display: flex;
+  flex-direction: column;
+  text-align: start;
+}
+
+.workbench__label {
+  display: inline;
+  font-weight: 600;
+  margin: 0;
+  text-align: start;
+}
+
+.workbench__label-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.1rem 0.15rem;
+}
+
+.workbench__hint {
+  display: block;
+  font-weight: 400;
+  color: var(--color-rail);
+  font-size: 0.85rem;
+  margin-block-start: 0.15rem;
+  text-align: start;
+}
+
+.workbench__input,
+.workbench__textarea {
+  display: block;
+  width: 100%;
+  max-width: 46rem;
+  margin: 0;
+  margin-block-start: 0.35rem;
+  padding-block: 0.45rem;
+  padding-inline: 0.55rem;
+  border: 1px solid color-mix(in srgb, var(--color-rail) 35%, var(--color-print));
+  border-radius: var(--radius-print);
+  background: var(--surface);
+  color: var(--color-ink);
+  font-family: var(--font-journal);
+  font-size: 1.05rem;
+  line-height: 1.5;
+  text-align: start;
+}
+
+.workbench__textarea {
+  resize: vertical;
+  min-height: 4.5rem;
+}
+
+.workbench__textarea--journal {
+  max-width: none;
+  min-height: 12.5rem;
+  /* Same period as the gradient so glyphs stay on the rules while scrolling. */
+  line-height: 1.65em;
+  /* 0 is a multiple of line-height; inherited 0.45rem padding-block would
+     phase-shift the first line once attachment is local. Inline padding stays. */
+  padding-block: 0;
+  background-color: var(--surface);
+  background-image: repeating-linear-gradient(
+    transparent,
+    transparent calc(1.65em - 1px),
+    color-mix(in srgb, var(--iris) 14%, transparent) calc(1.65em - 1px),
+    color-mix(in srgb, var(--iris) 14%, transparent) 1.65em
+  );
+  background-origin: content-box;
+  background-attachment: local;
+}
+
+.workbench__fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.9rem;
+}
+
+.journal-page {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 0.65rem;
+  padding-block: 0.95rem 1.1rem;
+  padding-inline: 0.95rem;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  background: color-mix(in srgb, var(--canvas) 40%, var(--surface));
+}
+
+.journal-page::before {
+  display: none;
+}
+
+.journal-page__kicker {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: -0.03em;
+  color: var(--color-ink);
+  text-align: start;
+}
+
+.journal-page__heading {
+  font-weight: 700;
+}
+
+.workbench__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.workbench__button {
+  font-family: var(--font-ui);
+  font-size: 0.95rem;
+  font-weight: 600;
+  padding-block: 0.55rem;
+  padding-inline: 1rem;
+  border: 1px solid var(--color-cyan);
+  border-radius: 999px;
+  background: var(--color-cyan);
+  color: #fff;
+  cursor: pointer;
+}
+
+.workbench__button:hover:not(:disabled) {
+  background: var(--iris-deep);
+}
+
+.workbench__button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.workbench__button--secondary {
+  background: var(--surface);
+  color: var(--color-ink);
+  border-color: color-mix(in srgb, var(--color-rail) 55%, var(--color-print));
+}
+
+.workbench__button--secondary:hover:not(:disabled) {
+  background: var(--color-print);
+}
+
+.workbench__button--save-dirty:not(:disabled) {
+  border-color: var(--color-cyan);
+  color: var(--color-cyan);
+}
+
+.workbench__status-rail {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.45rem 0.85rem;
+  padding-block: 0.55rem;
+  padding-inline: 0.85rem;
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-lamp);
+  animation: rise 0.45s var(--ease) both;
+}
+
+.workbench__job,
+.workbench__status,
+.workbench__summary {
+  margin: 0;
+  font-size: 0.9rem;
+  color: var(--color-ink);
+  text-align: start;
+}
+
+.workbench__upload-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.28rem;
+  flex: 1 1 12rem;
+  min-width: 10rem;
+  max-width: 24rem;
+}
+
+.workbench__upload-progress-track {
+  height: 0.35rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line) 70%, var(--surface));
+  overflow: hidden;
+}
+
+.workbench__upload-progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: var(--iris);
+  transition: width 0.15s var(--ease);
+}
+
+.workbench__upload-progress-label {
+  font-size: 0.78rem;
+  color: var(--mist);
+  font-variant-numeric: tabular-nums;
+}
+
+.workbench__job {
+  font-family: var(--font-mono);
+  font-size: 0.78rem;
+  color: var(--color-rail);
+}
+
+.workbench__job-label {
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: var(--color-rail);
+}
+
+.workbench__job code {
+  color: var(--color-ink);
+}
+
+.workbench__job-type,
+.workbench__job-status {
+  margin-inline-start: 0.55rem;
+  padding-block: 0.08rem;
+  padding-inline: 0.4rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--color-cyan) 12%, var(--color-print));
+  color: var(--color-cyan);
+  font-family: var(--font-ui);
+}
+
+.workbench__job-type {
+  font-weight: 600;
+  color: var(--color-ink);
+  background: color-mix(in srgb, var(--color-rail) 12%, var(--color-print));
+}
+
+.workbench__job-link {
+  margin-inline-start: 0.55rem;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-cyan);
+  text-decoration: none;
+}
+
+.workbench__job-link:hover {
+  color: var(--color-ink);
+}
+
+.workbench__job-cancel {
+  margin-inline-start: 0.55rem;
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-magenta);
+  background: transparent;
+  border: 1px solid color-mix(in srgb, var(--color-magenta) 40%, var(--color-print));
+  border-radius: var(--radius-print);
+  padding-block: 0.12rem;
+  padding-inline: 0.45rem;
+  cursor: pointer;
+}
+
+.workbench__job-cancel:disabled {
+  opacity: 0.55;
+  cursor: wait;
+}
+
+.workbench__job-error {
+  display: block;
+  margin-block-start: 0.25rem;
+  color: var(--color-magenta);
+}
+
+.workbench__error {
+  flex: 1 1 100%;
+  margin: 0;
+  padding-block: 0.55rem;
+  padding-inline: 0.7rem;
+  color: var(--color-magenta);
+  background: color-mix(in srgb, var(--color-magenta) 12%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--color-magenta) 28%, var(--surface));
+  border-radius: var(--radius-print);
+  text-align: start;
+}
+
+.workbench__structure-warning {
+  margin: 0;
+  margin-block-end: 0.85rem;
+  padding-block: 0.55rem;
+  padding-inline: 0.7rem;
+  color: var(--color-ink);
+  background: color-mix(in srgb, var(--color-amber, #c47a00) 14%, var(--surface));
+  border: 1px solid color-mix(in srgb, var(--color-amber, #c47a00) 32%, var(--surface));
+  border-radius: var(--radius-print);
+  text-align: start;
+  line-height: 1.45;
+}
+
+.workbench__link {
+  color: var(--color-cyan);
+  font-weight: 600;
+}
+
+.workbench__link:hover {
+  color: var(--color-ink);
+}
+
+.preview-grid {
+  list-style: none;
+  margin: 0;
+  margin-block-start: 0.65rem;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(16.25rem, 1fr));
+  gap: 0.75rem;
+  align-items: start;
+}
+
+.workbench__dock {
+  position: sticky;
+  inset-block-end: 0.6rem;
+  z-index: 20;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  padding-block: 0.7rem;
+  padding-inline: 0.9rem;
+  background: color-mix(in srgb, var(--surface) 90%, transparent);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-lamp);
+  backdrop-filter: blur(16px);
+}
+
+.workbench__dock-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 0;
+  text-align: start;
+}
+
+@media (max-width: 420px) {
+  .workbench__stage {
+    padding-block: 0.85rem;
+    padding-inline: 0.85rem;
+  }
+
+  .preview-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .workbench__button {
+    width: 100%;
+    text-align: center;
+  }
+
+  .folder-pick .workbench__button {
+    flex: 1 1 100%;
+  }
+
+  .workbench__dock .workbench__actions {
+    width: 100%;
+  }
+}

@@ -1,0 +1,195 @@
+:root {
+  --canvas: #eef1f6;
+  --surface: #ffffff;
+  --ink: #12151c;
+  --mist: #6a7382;
+  --line: #e6eaf2;
+  --iris: #5b6cff;
+  --iris-deep: #3d4cd6;
+  --ok: #1f9a78;
+  --stop: #e2556f;
+  --warn: #c48a1a;
+
+  --room: var(--ink);
+  --wall: var(--surface);
+  --lamp: var(--surface);
+  --lamp-edge: var(--line);
+  --gel: var(--iris);
+  --gel-deep: var(--iris-deep);
+  --muted: var(--mist);
+
+  --color-lightbox: var(--canvas);
+  --color-print: var(--surface);
+  --color-ink: var(--ink);
+  --color-cyan: var(--iris);
+  --color-magenta: var(--stop);
+  --color-rail: var(--mist);
+  --color-ok: var(--ok);
+  --color-warn: var(--warn);
+
+  --font-ui: "Heebo", "Rubik", "Segoe UI", "Arial Hebrew", sans-serif;
+  --font-journal: "Heebo", "Rubik", "Segoe UI", sans-serif;
+  --font-display: "Rubik", "Heebo", "Segoe UI", sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+
+  --radius-print: 0.65rem;
+  --radius-panel: 1.15rem;
+  --focus-ring: 2px solid var(--iris);
+  --shadow-lamp:
+    0 1px 0 rgba(18, 21, 28, 0.04),
+    0 18px 40px rgba(18, 21, 28, 0.06);
+  --ease: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+html {
+  font-size: 112.5%;
+  text-align: start;
+  color-scheme: light;
+}
+
+html[data-color-scheme="dark"] {
+  color-scheme: dark;
+  --canvas: #10141c;
+  --surface: #1a2030;
+  --ink: #f3f5f8;
+  --mist: #9aa3b2;
+  --line: #2c3444;
+  --iris: #7a88ff;
+  --iris-deep: #5f6ce8;
+  --ok: #3dba94;
+  --stop: #ff7a90;
+  --warn: #e0a84a;
+  --shadow-lamp:
+    0 1px 0 rgba(255, 255, 255, 0.04),
+    0 22px 48px rgba(0, 0, 0, 0.38);
+}
+
+body {
+  min-height: 100vh;
+  color: var(--ink);
+  font: 1rem / 1.5 var(--font-ui);
+  background-color: var(--canvas);
+  transition: background-color 0.35s var(--ease), color 0.35s var(--ease);
+}
+
+code {
+  font-family: var(--font-mono);
+}
+
+:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: 2px;
+}
+
+a,
+button {
+  transition:
+    background-color 0.22s var(--ease),
+    color 0.22s var(--ease),
+    border-color 0.22s var(--ease),
+    box-shadow 0.22s var(--ease),
+    transform 0.22s var(--ease),
+    opacity 0.22s var(--ease);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.workbench__stage,
+.album-library__stage,
+.job-list__stage,
+.job-detail__stage,
+.settings-page__stage {
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  color: var(--ink);
+  border: 1px solid color-mix(in srgb, var(--line) 80%, transparent);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-lamp);
+  backdrop-filter: blur(18px);
+  animation: rise 0.55s var(--ease) both;
+}
+
+.workbench__stage-title,
+.album-library__heading,
+.job-list__heading,
+.job-detail__heading,
+.settings-page__heading {
+  font-family: var(--font-display);
+  font-weight: 600;
+  letter-spacing: -0.04em;
+  color: var(--ink);
+}
+
+.album-library__lede,
+.job-list__lede,
+.settings-page__lede,
+.workbench__hint,
+.workbench__invite {
+  color: var(--mist);
+}
+
+@keyframes rise {
+  /* Opacity only: a lingering transform on ancestors (e.g. .app fill-mode)
+     creates a containing block that traps position:fixed overlays off-screen
+     on long album pages. */
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes drift-a {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate3d(6%, 8%, 0) scale(1.12);
+  }
+}
+
+@keyframes drift-b {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+
+  50% {
+    transform: translate3d(-8%, 5%, 0) scale(1.18);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

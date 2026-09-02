@@ -1,0 +1,108 @@
+.header-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  text-align: start;
+}
+
+.header-fields__heading {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.header-fields__hint {
+  margin: 0;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  color: var(--color-rail);
+}
+
+.header-fields__list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+}
+
+.header-fields__row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr) auto;
+  gap: 0.45rem;
+  align-items: end;
+}
+
+.header-fields__label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-family: var(--font-ui);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--color-rail);
+}
+
+.header-fields__input {
+  width: 100%;
+  margin: 0;
+  padding-block: 0.4rem;
+  padding-inline: 0.5rem;
+  border: 1px solid color-mix(in srgb, var(--color-rail) 35%, var(--color-print));
+  border-radius: var(--radius-print);
+  background: var(--surface);
+  color: var(--color-ink);
+  font-family: var(--font-mono);
+  font-size: 0.9rem;
+}
+
+.header-fields__add,
+.header-fields__remove {
+  font-family: var(--font-ui);
+  font-size: 0.88rem;
+  font-weight: 600;
+  padding-block: 0.4rem;
+  padding-inline: 0.7rem;
+  border-radius: var(--radius-print);
+  cursor: pointer;
+}
+
+.header-fields__add {
+  align-self: start;
+  background: var(--surface);
+  color: var(--color-cyan);
+  border: 1px solid color-mix(in srgb, var(--color-cyan) 45%, var(--color-print));
+}
+
+.header-fields__add:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-cyan) 8%, var(--color-print));
+}
+
+.header-fields__remove {
+  background: var(--surface);
+  color: var(--color-magenta);
+  border: 1px solid color-mix(in srgb, var(--color-magenta) 35%, var(--color-print));
+}
+
+.header-fields__remove:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--color-magenta) 10%, var(--surface));
+}
+
+.header-fields__add:disabled,
+.header-fields__remove:disabled,
+.header-fields__input:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+@media (max-width: 520px) {
+  .header-fields__row {
+    grid-template-columns: 1fr;
+  }
+
+  .header-fields__remove {
+    justify-self: start;
+  }
+}

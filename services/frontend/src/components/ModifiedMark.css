@@ -1,0 +1,23 @@
+.modified-mark {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  margin-inline-start: 0.4rem;
+  font-weight: 500;
+  font-size: 0.72rem;
+  letter-spacing: 0.01em;
+  color: color-mix(in srgb, var(--stop) 70%, var(--muted));
+  vertical-align: middle;
+}
+
+.modified-mark__dot {
+  flex: 0 0 auto;
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--stop) 55%, var(--gel));
+}
+
+.modified-mark__text {
+  line-height: 1;
+}

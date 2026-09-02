@@ -1,0 +1,55 @@
+.hint-tooltip {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  vertical-align: middle;
+}
+
+.hint-tooltip__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.15rem;
+  height: 1.15rem;
+  padding: 0;
+  border: 1px solid color-mix(in srgb, var(--iris) 35%, var(--line));
+  border-radius: 50%;
+  background: var(--surface);
+  color: var(--iris-deep);
+  font-family: var(--font-ui);
+  font-size: 0.72rem;
+  font-weight: 700;
+  font-style: italic;
+  line-height: 1;
+  cursor: help;
+}
+
+.hint-tooltip__trigger:hover {
+  background: color-mix(in srgb, var(--iris) 10%, var(--surface));
+}
+
+.hint-tooltip__bubble {
+  position: absolute;
+  z-index: 8;
+  inset-block-start: calc(100% + 0.4rem);
+  inset-inline-start: 0;
+  width: min(22rem, calc(100vw - 2rem));
+  padding-block: 0.55rem;
+  padding-inline: 0.7rem;
+  background: color-mix(in srgb, var(--surface) 92%, transparent);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 0.85rem;
+  box-shadow: var(--shadow-lamp);
+  backdrop-filter: blur(16px);
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  font-weight: 400;
+  font-style: normal;
+  line-height: 1.4;
+  text-align: start;
+}
+
+.hint-tooltip__bubble[hidden] {
+  display: none;
+}
