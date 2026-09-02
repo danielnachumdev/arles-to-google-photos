@@ -141,4 +141,29 @@ describe('ToastHost', () => {
     expect(router.state.location.pathname).toBe('/jobs/job-42')
     expect(screen.queryByRole('link', { name: t.toastOpenRun })).not.toBeInTheDocument()
   })
+
+  it('renders an external album action alongside the run link', () => {
+    renderHost()
+    act(() => {
+      toast.good({
+        message: t.toastUploadDone('#7'),
+        actions: [
+          {
+            href: 'https://photos.google.com/album/example',
+            label: t.toastOpenAlbum,
+            external: true,
+          },
+          { href: '/jobs/upload-7', label: t.toastOpenRun },
+        ],
+      })
+    })
+
+    const album = screen.getByRole('link', { name: t.toastOpenAlbum })
+    expect(album).toHaveAttribute('href', 'https://photos.google.com/album/example')
+    expect(album).toHaveAttribute('target', '_blank')
+    expect(screen.getByRole('link', { name: t.toastOpenRun })).toHaveAttribute(
+      'href',
+      '/jobs/upload-7',
+    )
+  })
 })

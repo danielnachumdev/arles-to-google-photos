@@ -11,6 +11,7 @@ export type TrackedRun = {
   error?: string | null
   error_code?: string | null
   scrape_url?: string | null
+  product_url?: string | null
   number?: number | null
 }
 
@@ -21,6 +22,7 @@ export type ListedRunSnapshot = {
   error?: string | null
   error_code?: string | null
   scrape_url?: string | null
+  product_url?: string | null
   number?: number | null
 }
 
@@ -113,6 +115,7 @@ export function trackRun(run: TrackedRun): void {
       existing.error === run.error &&
       existing.error_code === run.error_code &&
       existing.scrape_url === run.scrape_url &&
+      existing.product_url === run.product_url &&
       existing.number === run.number
     ) {
       return

@@ -60,6 +60,36 @@ describe('RunToaster', () => {
     })
   })
 
+  it('includes a Google Photos album action when product_url is present', async () => {
+    render(<RunToaster />)
+    act(() => {
+      trackRun({
+        id: 'upload-album',
+        kind: 'upload',
+        status: 'done',
+        number: 9,
+        product_url: 'https://photos.google.com/album/fixture',
+      })
+    })
+
+    await waitFor(() => {
+      expect(getToasts()).toEqual([
+        expect.objectContaining({
+          type: 'good',
+          message: t.toastUploadDone('#9'),
+          actions: [
+            {
+              href: 'https://photos.google.com/album/fixture',
+              label: t.toastOpenAlbum,
+              external: true,
+            },
+            { href: '/jobs/upload-album', label: t.toastOpenRun },
+          ],
+        }),
+      ])
+    })
+  })
+
   it('toasts preview success with the visible job number when present', async () => {
     render(<RunToaster />)
     act(() => {

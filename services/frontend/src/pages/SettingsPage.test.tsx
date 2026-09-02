@@ -220,6 +220,46 @@ describe('Settings appearance', () => {
   })
 })
 
+describe('Settings default import mode', () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn().mockResolvedValue(jsonResponse(SETTINGS)),
+    )
+  })
+
+  afterEach(() => {
+    setAppLanguage('he', false)
+    setColorScheme('light', false)
+    resetSettingsStore()
+    resetCookieStore()
+    resetGooglePhotosSessionStore()
+    toast.clear()
+    vi.unstubAllGlobals()
+  })
+
+  it('defaults to folder upload and applies web immediately without Save', () => {
+    const store = new SpyKvStore()
+    setSettingsStore(store)
+    renderAt('/settings')
+
+    expect(screen.getByRole('radio', { name: t.importModeUpload })).toBeChecked()
+
+    fireEvent.click(screen.getByRole('radio', { name: t.importModeWeb }))
+
+    expect(store.set).toHaveBeenCalledWith('defaultImportMode', 'web')
+    expect(screen.getByRole('radio', { name: t.importModeWeb })).toBeChecked()
+  })
+
+  it('uses stored default import mode on boot', () => {
+    const store = new SpyKvStore({ defaultImportMode: 'web' })
+    setSettingsStore(store)
+    renderAt('/settings')
+
+    expect(screen.getByRole('radio', { name: t.importModeWeb })).toBeChecked()
+  })
+})
+
 describe('Settings max concurrent jobs', () => {
   afterEach(() => {
     setAppLanguage('he', false)

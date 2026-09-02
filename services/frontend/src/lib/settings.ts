@@ -6,9 +6,18 @@ export const COLOR_SCHEMES = ['light', 'dark'] as const
 
 export type ColorScheme = (typeof COLOR_SCHEMES)[number]
 
+export const IMPORT_MODES = ['upload', 'web'] as const
+
+export type ImportModeSetting = (typeof IMPORT_MODES)[number]
+
+export const DEFAULT_IMPORT_MODE: ImportModeSetting = 'upload'
+
+export const SETTINGS_CHANGED_EVENT = 'arles-settings-changed'
+
 export const SETTINGS_KEYS = {
   language: 'language',
   colorScheme: 'colorScheme',
+  defaultImportMode: 'defaultImportMode',
 } as const
 
 export const COOKIE_KEYS = {
@@ -67,6 +76,31 @@ export function readColorSchemeSetting(): ColorScheme | null {
 
 export function writeColorSchemeSetting(scheme: ColorScheme): void {
   store.set(SETTINGS_KEYS.colorScheme, scheme)
+}
+
+function notifySettingsChanged(): void {
+  if (typeof window === 'undefined') {
+    return
+  }
+  window.dispatchEvent(new Event(SETTINGS_CHANGED_EVENT))
+}
+
+export function parseImportModeSetting(value: string | null): ImportModeSetting | null {
+  for (const mode of IMPORT_MODES) {
+    if (value === mode) {
+      return mode
+    }
+  }
+  return null
+}
+
+export function readDefaultImportMode(): ImportModeSetting {
+  return parseImportModeSetting(store.get(SETTINGS_KEYS.defaultImportMode)) ?? DEFAULT_IMPORT_MODE
+}
+
+export function writeDefaultImportMode(mode: ImportModeSetting): void {
+  store.set(SETTINGS_KEYS.defaultImportMode, mode)
+  notifySettingsChanged()
 }
 
 export function readCachedImportHeaders(): Record<string, string> | null {

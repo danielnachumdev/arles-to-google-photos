@@ -72,6 +72,12 @@
   text-align: start;
 }
 
+.toast__actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.85rem;
+}
+
 .toast__link {
   color: var(--iris-deep);
   font-weight: 600;

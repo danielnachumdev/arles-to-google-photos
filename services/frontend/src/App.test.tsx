@@ -99,7 +99,7 @@ class AppRoutesHarness extends RoutedPageTestBase {
 }
 
 function pickDay1Folder(): void {
-  fireEvent.click(screen.getByRole('radio', { name: t.importModeUpload }))
+  fireEvent.click(screen.getByRole('checkbox', { name: t.autoPublishLabel }))
   const input = document.querySelector('input[type="file"]') as HTMLInputElement
   const files = FakeAlbumFiles.day1Index()
   FakeAlbumFiles.assignToInput(input, files)
@@ -118,15 +118,16 @@ describe('App routes', () => {
     harness.teardown()
   })
 
-  it('home has web import and does not dump the full album history', async () => {
+  it('home has folder upload by default and does not dump the full album history', async () => {
     const { router } = harness.renderApp('/')
 
     expect(router.state.location.pathname).toBe('/')
     expect(screen.getByText(t.lede)).toBeInTheDocument()
     expect(screen.getByRole('link', { name: t.openAlbumLibrary })).toHaveAttribute('href', '/albums')
-    expect(screen.getByRole('heading', { name: t.webImportHeading })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: t.startWebImport })).toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: t.importModeWeb })).toBeChecked()
+    expect(screen.getByRole('heading', { name: t.folderHeading })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: t.preparePreview })).toBeInTheDocument()
+    expect(screen.getByRole('radio', { name: t.importModeUpload })).toBeChecked()
+    expect(screen.getByRole('checkbox', { name: t.autoPublishLabel })).toBeChecked()
     expect(screen.queryByRole('heading', { name: t.libraryHeading })).not.toBeInTheDocument()
     expect(screen.queryByLabelText(t.searchLabel)).not.toBeInTheDocument()
     expect(screen.queryByText('קיץ 2012')).not.toBeInTheDocument()
@@ -254,6 +255,8 @@ describe('App routes', () => {
     })
 
     const { router } = harness.renderApp('/')
+    fireEvent.click(screen.getByRole('radio', { name: t.importModeWeb }))
+    fireEvent.click(screen.getByRole('checkbox', { name: t.autoPublishLabel }))
     fireEvent.change(screen.getByLabelText(t.webUrlLabel), {
       target: { value: 'https://gallery.example/index.html' },
     })
@@ -593,7 +596,7 @@ describe('App routes', () => {
     expect(await screen.findByRole('heading', { name: t.jobsHeading })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: t.navJobs })).toHaveAttribute('aria-current', 'page')
     fireEvent.click(screen.getByRole('link', { name: t.navHome }))
-    expect(screen.getByRole('heading', { name: t.webImportHeading })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: t.folderHeading })).toBeInTheDocument()
     expect(screen.queryByLabelText(t.searchLabel)).not.toBeInTheDocument()
   })
 

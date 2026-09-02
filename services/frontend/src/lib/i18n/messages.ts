@@ -248,6 +248,7 @@ export type MessageCatalog = {
   close: string
   toastDismissAria: string
   toastOpenRun: string
+  toastOpenAlbum: string
   toastRunSubmitted: (jobLabel: string) => string
   toastPreviewDone: (jobLabel: string) => string
   toastUploadDone: (jobLabel: string) => string
@@ -271,6 +272,8 @@ export type MessageCatalog = {
   appearanceHint: string
   appearanceLight: string
   appearanceDark: string
+  settingsDefaultImportModeHeading: string
+  settingsDefaultImportModeHint: string
   settingsClearCookies: string
   settingsClearCookiesHint: string
   settingsSignOutGoogle: string

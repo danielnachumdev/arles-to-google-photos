@@ -2,6 +2,12 @@ export const TOAST_TYPES = ['good', 'bad', 'warning', 'regular'] as const
 
 export type ToastType = (typeof TOAST_TYPES)[number]
 
+export type ToastAction = {
+  href: string
+  label: string
+  external?: boolean
+}
+
 export type ToastRecord = {
   id: string
   type: ToastType
@@ -9,6 +15,7 @@ export type ToastRecord = {
   durationMs: number
   href?: string
   linkLabel?: string
+  actions?: ToastAction[]
 }
 
 export type ToastContentOptions = {
@@ -16,6 +23,7 @@ export type ToastContentOptions = {
   durationMs?: number
   href?: string
   linkLabel?: string
+  actions?: ToastAction[]
 }
 
 export type ToastShowOptions = ToastContentOptions & {
@@ -61,10 +69,29 @@ export function getToasts(): ToastRecord[] {
   return toasts
 }
 
+export function resolveToastActions(record: {
+  href?: string
+  linkLabel?: string
+  actions?: ToastAction[]
+}): ToastAction[] {
+  if (record.actions && record.actions.length > 0) {
+    return record.actions
+  }
+  if (record.href && record.linkLabel) {
+    return [{ href: record.href, label: record.linkLabel }]
+  }
+  return []
+}
+
 function enqueue(
   type: ToastType,
   message: string,
-  extra?: { durationMs?: number; href?: string; linkLabel?: string },
+  extra?: {
+    durationMs?: number
+    href?: string
+    linkLabel?: string
+    actions?: ToastAction[]
+  },
 ): string {
   const id = `toast-${nextSeq}`
   nextSeq += 1
@@ -75,6 +102,9 @@ function enqueue(
   }
   if (extra?.linkLabel) {
     record.linkLabel = extra.linkLabel
+  }
+  if (extra?.actions && extra.actions.length > 0) {
+    record.actions = extra.actions
   }
   let next = [...toasts, record]
   if (next.length > MAX_TOASTS) {
@@ -121,11 +151,13 @@ function extrasFromContent(content: ToastContentOptions): {
   durationMs?: number
   href?: string
   linkLabel?: string
+  actions?: ToastAction[]
 } {
   return {
     durationMs: content.durationMs,
     href: content.href,
     linkLabel: content.linkLabel,
+    actions: content.actions,
   }
 }
 
@@ -150,6 +182,7 @@ function typedToast(type: ToastType, messageOrOptions: string | ToastContentOpti
     durationMs: messageOrOptions.durationMs ?? durationMs,
     href: messageOrOptions.href,
     linkLabel: messageOrOptions.linkLabel,
+    actions: messageOrOptions.actions,
   })
 }
 

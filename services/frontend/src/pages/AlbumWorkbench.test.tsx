@@ -140,6 +140,8 @@ describe('AlbumWorkbench publish sign-in', () => {
       return jsonResponse({ jobs: [] })
     })
     harness.renderHome()
+    fireEvent.click(screen.getByRole('radio', { name: t.importModeWeb }))
+    fireEvent.click(screen.getByRole('checkbox', { name: t.autoPublishLabel }))
     fireEvent.change(screen.getByLabelText(t.webUrlLabel), {
       target: { value: 'https://gallery.example/index.html' },
     })
@@ -168,6 +170,8 @@ describe('AlbumWorkbench publish sign-in', () => {
       return jsonResponse({ jobs: [] })
     })
     harness.renderHome()
+    fireEvent.click(screen.getByRole('radio', { name: t.importModeWeb }))
+    fireEvent.click(screen.getByRole('checkbox', { name: t.autoPublishLabel }))
     fireEvent.change(screen.getByLabelText(t.webUrlLabel), {
       target: { value: url },
     })
@@ -188,7 +192,7 @@ describe('AlbumWorkbench publish sign-in', () => {
       return jsonResponse({ jobs: [] })
     })
     harness.renderHome()
-    fireEvent.click(screen.getByRole('radio', { name: t.importModeUpload }))
+    fireEvent.click(screen.getByRole('checkbox', { name: t.autoPublishLabel }))
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     const files = FakeAlbumFiles.day1Index()
     FakeAlbumFiles.assignToInput(input, files)
@@ -212,7 +216,7 @@ describe('AlbumWorkbench publish sign-in', () => {
       return jsonResponse({ jobs: [] })
     })
     harness.renderHome()
-    fireEvent.click(screen.getByRole('radio', { name: t.importModeUpload }))
+    fireEvent.click(screen.getByRole('checkbox', { name: t.autoPublishLabel }))
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     const files = FakeAlbumFiles.day1Index()
     FakeAlbumFiles.assignToInput(input, files)
@@ -721,7 +725,7 @@ describe('AlbumWorkbench publish sign-in', () => {
     vi.mocked(requestGooglePhotosAccessToken).mockResolvedValueOnce('ya29.auto')
     harness.renderHome(onJobCreated)
 
-    fireEvent.click(screen.getByRole('checkbox', { name: t.autoPublishLabel }))
+    fireEvent.click(screen.getByRole('radio', { name: t.importModeWeb }))
     fireEvent.change(screen.getByLabelText(t.webUrlLabel), {
       target: { value: 'https://gallery.example/index.html' },
     })
@@ -744,7 +748,7 @@ describe('AlbumWorkbench publish sign-in', () => {
     vi.mocked(requestGooglePhotosAccessToken).mockRejectedValueOnce(new GoogleAuthCancelledError())
     harness.renderHome(onJobCreated)
 
-    fireEvent.click(screen.getByRole('checkbox', { name: t.autoPublishLabel }))
+    fireEvent.click(screen.getByRole('radio', { name: t.importModeWeb }))
     fireEvent.change(screen.getByLabelText(t.webUrlLabel), {
       target: { value: 'https://gallery.example/index.html' },
     })
@@ -774,6 +778,8 @@ describe('AlbumWorkbench publish sign-in', () => {
     })
     harness.renderHome(onJobCreated)
 
+    fireEvent.click(screen.getByRole('radio', { name: t.importModeWeb }))
+    fireEvent.click(screen.getByRole('checkbox', { name: t.autoPublishLabel }))
     fireEvent.change(screen.getByLabelText(t.webUrlLabel), {
       target: { value: 'https://gallery.example/index.html' },
     })
@@ -801,6 +807,8 @@ describe('AlbumWorkbench publish sign-in', () => {
     })
     harness.renderHome(onJobCreated)
 
+    fireEvent.click(screen.getByRole('radio', { name: t.importModeWeb }))
+    fireEvent.click(screen.getByRole('checkbox', { name: t.autoPublishLabel }))
     fireEvent.change(screen.getByLabelText(t.webUrlLabel), {
       target: { value: 'https://gallery.example/index.html' },
     })
@@ -1222,7 +1230,7 @@ describe('AlbumWorkbench publish sign-in', () => {
       return jsonResponse({ jobs: [] })
     })
     harness.renderHome()
-    fireEvent.click(screen.getByRole('radio', { name: t.importModeUpload }))
+    fireEvent.click(screen.getByRole('checkbox', { name: t.autoPublishLabel }))
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     const files = FakeAlbumFiles.day1Index()
     FakeAlbumFiles.assignToInput(input, files)
@@ -1256,7 +1264,7 @@ describe('AlbumWorkbench publish sign-in', () => {
       return jsonResponse({ jobs: [] })
     })
     harness.renderHome()
-    fireEvent.click(screen.getByRole('radio', { name: t.importModeUpload }))
+    fireEvent.click(screen.getByRole('checkbox', { name: t.autoPublishLabel }))
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     const files = FakeAlbumFiles.day1Index()
     FakeAlbumFiles.assignToInput(input, files)
@@ -1300,12 +1308,10 @@ describe('AlbumWorkbench publish sign-in', () => {
     })
     vi.mocked(requestGooglePhotosAccessToken).mockResolvedValueOnce('ya29.folder')
     harness.renderHome(onJobCreated)
-    fireEvent.click(screen.getByRole('radio', { name: t.importModeUpload }))
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     const files = FakeAlbumFiles.day1Index()
     FakeAlbumFiles.assignToInput(input, files)
     fireEvent.change(input, { target: { files } })
-    fireEvent.click(screen.getByRole('checkbox', { name: t.autoPublishLabel }))
     fireEvent.click(screen.getByRole('button', { name: t.preparePreview }))
 
     await waitFor(() => {
@@ -1319,12 +1325,10 @@ describe('AlbumWorkbench publish sign-in', () => {
   it('surfaces a Google error when folder auto-publish sign-in fails', async () => {
     vi.mocked(requestGooglePhotosAccessToken).mockRejectedValueOnce(new Error('invalid_grant'))
     harness.renderHome()
-    fireEvent.click(screen.getByRole('radio', { name: t.importModeUpload }))
     const input = document.querySelector('input[type="file"]') as HTMLInputElement
     const files = FakeAlbumFiles.day1Index()
     FakeAlbumFiles.assignToInput(input, files)
     fireEvent.change(input, { target: { files } })
-    fireEvent.click(screen.getByRole('checkbox', { name: t.autoPublishLabel }))
     fireEvent.click(screen.getByRole('button', { name: t.preparePreview }))
     expect(await screen.findByRole('alert')).toHaveTextContent(t.errorPublish('invalid_grant'))
     expect(

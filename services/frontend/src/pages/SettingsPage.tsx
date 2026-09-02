@@ -4,7 +4,7 @@ import { HintTooltip } from '../components/HintTooltip.tsx'
 import { LoadingSpinner } from '../components/LoadingSpinner.tsx'
 import { useAppearance } from '../lib/appearance.ts'
 import { formatApiError } from '../lib/formatApiError.ts'
-import { clearImportCookies } from '../lib/settings.ts'
+import { clearImportCookies, readDefaultImportMode, writeDefaultImportMode, type ImportModeSetting } from '../lib/settings.ts'
 import { clearGooglePhotosSession } from '../storage/googlePhotosSession.ts'
 import { messages, useLanguage, type AppLanguage } from '../lib/language.ts'
 import { toast } from '../lib/toast.ts'
@@ -18,6 +18,9 @@ export function SettingsPage() {
   const { colorScheme, setColorScheme } = useAppearance()
   const maxConcurrentId = useId()
   const [draftLanguage, setDraftLanguage] = useState<AppLanguage>(language)
+  const [defaultImportMode, setDefaultImportMode] = useState<ImportModeSetting>(() =>
+    readDefaultImportMode(),
+  )
   const [maxConcurrent, setMaxConcurrent] = useState('3')
   const [queueCounts, setQueueCounts] = useState<{
     pending: number
@@ -159,6 +162,38 @@ export function SettingsPage() {
                   onChange={() => setColorScheme('dark')}
                 />
                 {t.appearanceDark}
+              </label>
+            </div>
+          </fieldset>
+          <fieldset className="settings-page__fieldset">
+            <legend className="settings-page__legend">{t.settingsDefaultImportModeHeading}</legend>
+            <p className="settings-page__hint">{t.settingsDefaultImportModeHint}</p>
+            <div className="settings-page__options">
+              <label className="settings-page__option">
+                <input
+                  type="radio"
+                  name="default-import-mode"
+                  value="upload"
+                  checked={defaultImportMode === 'upload'}
+                  onChange={() => {
+                    setDefaultImportMode('upload')
+                    writeDefaultImportMode('upload')
+                  }}
+                />
+                {t.importModeUpload}
+              </label>
+              <label className="settings-page__option">
+                <input
+                  type="radio"
+                  name="default-import-mode"
+                  value="web"
+                  checked={defaultImportMode === 'web'}
+                  onChange={() => {
+                    setDefaultImportMode('web')
+                    writeDefaultImportMode('web')
+                  }}
+                />
+                {t.importModeWeb}
               </label>
             </div>
           </fieldset>

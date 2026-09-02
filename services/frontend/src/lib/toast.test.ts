@@ -54,6 +54,28 @@ describe('toast store', () => {
     expect(getToasts()[0]!.message).not.toMatch(/<a /)
   })
 
+  it('stores multiple toast actions including external album links', () => {
+    const id = toast.good({
+      message: 'Upload finished.',
+      actions: [
+        { href: 'https://photos.example/a', label: 'View album', external: true },
+        { href: '/jobs/u1', label: 'Open run' },
+      ],
+    })
+    expect(getToasts()).toEqual([
+      {
+        id,
+        type: 'good',
+        message: 'Upload finished.',
+        actions: [
+          { href: 'https://photos.example/a', label: 'View album', external: true },
+          { href: '/jobs/u1', label: 'Open run' },
+        ],
+        durationMs: TOAST_DURATION_MS.good,
+      },
+    ])
+  })
+
   it('accepts a link on toast.show and typed helpers', () => {
     toast.show({
       type: 'good',

@@ -6,9 +6,13 @@ import {
   COOKIE_KEYS,
   clearImportCookies,
   resetCookieStore,
+  resetSettingsStore,
   setCookieStore,
+  setSettingsStore,
+  writeDefaultImportMode,
 } from '../lib/settings.ts'
 import { createMemoryCookieStore } from '../storage/cookies.ts'
+import { SpyKvStore } from '../testing/index.ts'
 import { ImportDesk } from './ImportDesk.tsx'
 
 function renderDesk(onImportWeb = vi.fn(), onPreparePreview = vi.fn()) {
@@ -30,40 +34,58 @@ function renderDesk(onImportWeb = vi.fn(), onPreparePreview = vi.fn()) {
   }
 }
 
+function switchToWeb(): void {
+  fireEvent.click(screen.getByRole('radio', { name: t.importModeWeb }))
+}
+
 describe('ImportDesk', () => {
   beforeEach(() => {
     setCookieStore(createMemoryCookieStore())
+    resetSettingsStore()
   })
 
   afterEach(() => {
     resetCookieStore()
+    resetSettingsStore()
   })
 
-  it('defaults to web import and can switch to folder upload', () => {
+  it('defaults to folder upload with auto-publish on, and can switch to web', () => {
     renderDesk()
 
     const radios = screen.getAllByRole('radio')
-    expect(radios[0]).toHaveAccessibleName(t.importModeWeb)
-    expect(radios[1]).toHaveAccessibleName(t.importModeUpload)
+    expect(radios[0]).toHaveAccessibleName(t.importModeUpload)
+    expect(radios[1]).toHaveAccessibleName(t.importModeWeb)
     expect(radios[0]).toBeChecked()
+
+    expect(screen.getByRole('heading', { name: t.folderHeading })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: t.preparePreview })).toBeDisabled()
+    expect(screen.queryByRole('button', { name: t.startWebImport })).not.toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: t.autoPublishLabel })).toBeChecked()
+
+    switchToWeb()
 
     expect(screen.getByRole('heading', { name: t.webImportHeading })).toBeInTheDocument()
     expect(screen.getByLabelText(t.webUrlLabel)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: t.startWebImport })).toBeDisabled()
-    expect(screen.queryByRole('button', { name: t.preparePreview })).not.toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: t.cacheHeadersLabel })).toBeChecked()
-    expect(screen.getByRole('checkbox', { name: t.autoPublishLabel })).not.toBeChecked()
+    expect(screen.getByRole('radio', { name: t.importModeWeb })).toBeChecked()
+    expect(screen.queryByRole('button', { name: t.preparePreview })).not.toBeInTheDocument()
+  })
 
-    fireEvent.click(screen.getByRole('radio', { name: t.importModeUpload }))
+  it('honors the stored default import mode setting', () => {
+    const kv = new SpyKvStore()
+    setSettingsStore(kv)
+    writeDefaultImportMode('web')
 
-    expect(screen.getByRole('heading', { name: t.folderHeading })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: t.preparePreview })).toBeInTheDocument()
-    expect(screen.getByRole('radio', { name: t.importModeUpload })).toBeChecked()
-    expect(screen.queryByRole('button', { name: t.startWebImport })).not.toBeInTheDocument()
+    renderDesk()
+
+    expect(screen.getByRole('radio', { name: t.importModeWeb })).toBeChecked()
+    expect(screen.getByRole('heading', { name: t.webImportHeading })).toBeInTheDocument()
   })
 
   it('submits gallery url and optional headers', () => {
     const { onImportWeb } = renderDesk()
+    switchToWeb()
 
     fireEvent.change(screen.getByLabelText(t.webUrlLabel), {
       target: { value: 'https://gallery.example/index.html' },
@@ -82,19 +104,20 @@ describe('ImportDesk', () => {
       {
         'X-Test-Header': 'fixture-value',
       },
-      false,
+      true,
     )
   })
 
   it('submits url only when header rows are blank', () => {
     const { onImportWeb } = renderDesk()
+    switchToWeb()
 
     fireEvent.change(screen.getByLabelText(t.webUrlLabel), {
       target: { value: '  https://gallery.example/day1/  ' },
     })
     fireEvent.click(screen.getByRole('button', { name: t.startWebImport }))
 
-    expect(onImportWeb).toHaveBeenCalledWith('https://gallery.example/day1/', undefined, false)
+    expect(onImportWeb).toHaveBeenCalledWith('https://gallery.example/day1/', undefined, true)
   })
 
   it('caches used headers when the toggle is on and prefills them on remount', () => {
@@ -102,6 +125,7 @@ describe('ImportDesk', () => {
     setCookieStore(cookies)
 
     const first = renderDesk()
+    switchToWeb()
     fireEvent.change(screen.getByLabelText(t.webUrlLabel), {
       target: { value: 'https://gallery.example/index.html' },
     })
@@ -119,6 +143,7 @@ describe('ImportDesk', () => {
 
     first.unmount()
     renderDesk()
+    switchToWeb()
 
     expect(screen.getByLabelText(t.headerNameLabel)).toHaveValue('Cookie')
     expect(screen.getByLabelText(t.headerValueLabel)).toHaveValue('session=abc')
@@ -129,6 +154,7 @@ describe('ImportDesk', () => {
     setCookieStore(cookies)
 
     renderDesk()
+    switchToWeb()
     fireEvent.click(screen.getByRole('checkbox', { name: t.cacheHeadersLabel }))
     fireEvent.change(screen.getByLabelText(t.webUrlLabel), {
       target: { value: 'https://gallery.example/index.html' },
@@ -145,8 +171,9 @@ describe('ImportDesk', () => {
     expect(cookies.get(COOKIE_KEYS.cacheHeaders)).toBe('0')
   })
 
-  it('passes auto-publish when the toggle is on for web import', () => {
+  it('can turn off auto-publish for web import', () => {
     const { onImportWeb } = renderDesk()
+    switchToWeb()
 
     fireEvent.click(screen.getByRole('checkbox', { name: t.autoPublishLabel }))
     fireEvent.change(screen.getByLabelText(t.webUrlLabel), {
@@ -157,11 +184,11 @@ describe('ImportDesk', () => {
     expect(onImportWeb).toHaveBeenCalledWith(
       'https://gallery.example/index.html',
       undefined,
-      true,
+      false,
     )
   })
 
-  it('passes auto-publish when preparing a folder preview', () => {
+  it('passes auto-publish by default when preparing a folder preview', () => {
     const onPreparePreview = vi.fn()
     render(
       <ImportDesk
@@ -175,8 +202,6 @@ describe('ImportDesk', () => {
         onImportWeb={vi.fn()}
       />,
     )
-    fireEvent.click(screen.getByRole('radio', { name: t.importModeUpload }))
-    fireEvent.click(screen.getByRole('checkbox', { name: t.autoPublishLabel }))
     fireEvent.click(screen.getByRole('button', { name: t.preparePreview }))
     expect(onPreparePreview).toHaveBeenCalledWith(true)
   })
@@ -190,6 +215,7 @@ describe('ImportDesk', () => {
     clearImportCookies()
 
     renderDesk()
+    switchToWeb()
 
     expect(screen.getByLabelText(t.headerNameLabel)).toHaveValue('')
     expect(screen.getByLabelText(t.headerValueLabel)).toHaveValue('')

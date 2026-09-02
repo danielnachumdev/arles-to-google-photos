@@ -187,7 +187,7 @@ export const en: MessageCatalog = {
   typeScrape: 'Web import',
 
   importModeAria: 'Import source',
-  importModeUpload: 'Or upload an exported album folder',
+  importModeUpload: 'Upload an exported album folder',
   importModeWeb: 'Import from web',
   autoPublishLabel: 'Auto-publish to Photos',
   autoPublishHint:
@@ -310,6 +310,7 @@ export const en: MessageCatalog = {
   close: 'Close',
   toastDismissAria: 'Dismiss notification',
   toastOpenRun: 'Open run',
+  toastOpenAlbum: 'View album on Google',
   toastRunSubmitted: (jobLabel) => `Run started. ${jobLabel}`,
   toastPreviewDone: (jobLabel) => `Preview is ready. ${jobLabel}`,
   toastUploadDone: (jobLabel) => `Upload finished. ${jobLabel}`,
@@ -330,12 +331,16 @@ export const en: MessageCatalog = {
   discardLeave: 'Discard',
 
   settingsHeading: 'Settings',
-  settingsLede: 'Choose language and the job queue. Save to apply. Appearance applies immediately.',
+  settingsLede:
+    'Choose language and the job queue. Save to apply. Appearance and default import source apply immediately.',
   languageLabel: 'Interface language',
   appearanceLabel: 'Appearance',
   appearanceHint: 'Applies immediately on this device.',
   appearanceLight: 'Light',
   appearanceDark: 'Dark',
+  settingsDefaultImportModeHeading: 'Default import source',
+  settingsDefaultImportModeHint:
+    'Which import method the New album desk opens with. Applies immediately on this device.',
   settingsClearCookies: 'Clear saved cookies',
   settingsClearCookiesHint: 'Removes cached import headers.',
   settingsSignOutGoogle: 'Sign out of Google Photos',

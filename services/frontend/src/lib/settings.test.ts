@@ -5,9 +5,11 @@ import {
   clearImportCookies,
   parseAppLanguage,
   parseColorScheme,
+  parseImportModeSetting,
   readCacheHeadersToggle,
   readCachedImportHeaders,
   readColorSchemeSetting,
+  readDefaultImportMode,
   readLanguageSetting,
   resetCookieStore,
   resetSettingsStore,
@@ -16,6 +18,7 @@ import {
   writeCacheHeadersToggle,
   writeCachedImportHeaders,
   writeColorSchemeSetting,
+  writeDefaultImportMode,
   writeLanguageSetting,
 } from './settings.ts'
 
@@ -47,6 +50,20 @@ describe('settings cookie helpers', () => {
     writeColorSchemeSetting('dark')
     expect(kv.set).toHaveBeenCalledWith('colorScheme', 'dark')
     expect(readColorSchemeSetting()).toBe('dark')
+  })
+
+  it('defaults import mode to folder upload and persists overrides', () => {
+    const kv = new SpyKvStore()
+    setSettingsStore(kv)
+    expect(parseImportModeSetting(null)).toBeNull()
+    expect(parseImportModeSetting('folder')).toBeNull()
+    expect(parseImportModeSetting('upload')).toBe('upload')
+    expect(readDefaultImportMode()).toBe('upload')
+    writeDefaultImportMode('web')
+    expect(kv.set).toHaveBeenCalledWith('defaultImportMode', 'web')
+    expect(readDefaultImportMode()).toBe('web')
+    writeDefaultImportMode('upload')
+    expect(readDefaultImportMode()).toBe('upload')
   })
 
   it('ignores invalid cached import header JSON', () => {

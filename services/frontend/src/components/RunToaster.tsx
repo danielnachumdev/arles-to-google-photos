@@ -74,7 +74,31 @@ function asListedRun(job: JobSummary): ListedRunSnapshot {
     error: job.error,
     error_code: job.error_code,
     scrape_url: job.scrape_url,
+    product_url: job.product_url,
     number: job.number,
+  }
+}
+
+function completionActions(jobId: string, productUrl?: string | null): {
+  href: string
+  linkLabel: string
+  actions?: Array<{ href: string; label: string; external?: boolean }>
+  durationMs?: number
+} {
+  const href = runHref(jobId)
+  const linkLabel = t.toastOpenRun
+  const albumUrl = (productUrl ?? '').trim()
+  if (!albumUrl) {
+    return { href, linkLabel }
+  }
+  return {
+    href,
+    linkLabel,
+    durationMs: 8000,
+    actions: [
+      { href: albumUrl, label: t.toastOpenAlbum, external: true },
+      { href, label: linkLabel },
+    ],
   }
 }
 
@@ -85,32 +109,34 @@ function toastCompletion(job: {
   error?: string | null
   error_code?: string | null
   scrape_url?: string | null
+  product_url?: string | null
   number?: number | null
 }): void {
   if (!consumeRunToast(job.id)) {
     untrackRun(job.id)
     return
   }
-  const href = runHref(job.id)
-  const linkLabel = t.toastOpenRun
+  const links = completionActions(
+    job.id,
+    job.status === 'done' ? job.product_url : null,
+  )
   const jobLabel = jobToastLabel(job.id, job.number)
   if (job.status === 'done') {
     toast.good({
       message: doneMessage(job.kind, jobLabel),
-      href,
-      linkLabel,
+      ...links,
     })
   } else if (job.status === 'cancelled') {
     toast.regular({
       message: t.toastRunCancelledJob(jobLabel),
-      href,
-      linkLabel,
+      href: links.href,
+      linkLabel: links.linkLabel,
     })
   } else {
     toast.bad({
       message: failedMessage(job.kind, jobLabel, job),
-      href,
-      linkLabel,
+      href: links.href,
+      linkLabel: links.linkLabel,
     })
   }
   untrackRun(job.id)
@@ -125,6 +151,7 @@ function followListedJob(job: ListedRunSnapshot): void {
     error: job.error,
     error_code: job.error_code,
     scrape_url: job.scrape_url,
+    product_url: job.product_url,
     number: job.number,
   })
 }
@@ -141,6 +168,7 @@ function startWatch(run: TrackedRun): () => void {
     error?: string | null
     error_code?: string | null
     scrape_url?: string | null
+    product_url?: string | null
     number?: number | null
   }): void {
     if (cancelled || !isTerminalJobStatus(job.status)) {
@@ -153,6 +181,7 @@ function startWatch(run: TrackedRun): () => void {
       error: job.error,
       error_code: job.error_code,
       scrape_url: job.scrape_url,
+      product_url: job.product_url,
       number: job.number,
     })
   }
@@ -170,6 +199,7 @@ function startWatch(run: TrackedRun): () => void {
         error: job.error,
         error_code: job.error_code ?? run.error_code,
         scrape_url: job.scrape_url ?? run.scrape_url,
+        product_url: job.product_url ?? run.product_url,
         number: job.number ?? run.number,
       })
     } catch {
@@ -197,6 +227,7 @@ function startWatch(run: TrackedRun): () => void {
             error: job.error,
             error_code: job.error_code ?? run.error_code,
             scrape_url: job.scrape_url ?? run.scrape_url,
+            product_url: job.product_url ?? run.product_url,
             number: job.number ?? run.number,
           })
           return
@@ -208,6 +239,7 @@ function startWatch(run: TrackedRun): () => void {
           error: failed ? job.error || event.message || null : null,
           error_code: failed ? job.error_code ?? run.error_code : null,
           scrape_url: job.scrape_url ?? run.scrape_url,
+          product_url: job.product_url ?? run.product_url,
           number: job.number ?? run.number,
         })
       })
@@ -219,6 +251,7 @@ function startWatch(run: TrackedRun): () => void {
           error: failed ? event.message || null : null,
           error_code: failed ? run.error_code : null,
           scrape_url: run.scrape_url,
+          product_url: run.product_url,
           number: run.number,
         })
       })
@@ -232,6 +265,7 @@ function startWatch(run: TrackedRun): () => void {
       error: run.error,
       error_code: run.error_code,
       scrape_url: run.scrape_url,
+      product_url: run.product_url,
       number: run.number,
     })
     return () => {
@@ -312,6 +346,7 @@ export function RunToaster() {
               error: job.error,
               error_code: job.error_code,
               scrape_url: job.scrape_url,
+              product_url: job.product_url,
               number: job.number,
             })
           }

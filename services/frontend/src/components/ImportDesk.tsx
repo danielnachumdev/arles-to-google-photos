@@ -1,10 +1,13 @@
-import { useId, useState } from 'react'
+import { useEffect, useId, useState } from 'react'
 import { t } from '../lib/language.ts'
 import {
   readCacheHeadersToggle,
   readCachedImportHeaders,
+  readDefaultImportMode,
+  SETTINGS_CHANGED_EVENT,
   writeCacheHeadersToggle,
   writeCachedImportHeaders,
+  type ImportModeSetting,
 } from '../lib/settings.ts'
 import {
   compactHeaderRows,
@@ -14,7 +17,7 @@ import {
 } from './HeaderFields.tsx'
 import './ImportDesk.css'
 
-export type ImportMode = 'upload' | 'web'
+export type ImportMode = ImportModeSetting
 
 function initialHeaderRows(): HeaderRow[] {
   const cached = readCachedImportHeaders()
@@ -46,11 +49,21 @@ export function ImportDesk({
   const modeName = useId()
   const urlId = useId()
   const autoPublishId = useId()
-  const [mode, setMode] = useState<ImportMode>('web')
-  const [autoPublish, setAutoPublish] = useState(false)
+  const [mode, setMode] = useState<ImportMode>(() => readDefaultImportMode())
+  const [autoPublish, setAutoPublish] = useState(true)
   const [url, setUrl] = useState('')
   const [headerRows, setHeaderRows] = useState<HeaderRow[]>(initialHeaderRows)
   const [cacheHeaders, setCacheHeaders] = useState(() => readCacheHeadersToggle())
+
+  useEffect(() => {
+    function syncDefaultMode(): void {
+      setMode(readDefaultImportMode())
+    }
+    window.addEventListener(SETTINGS_CHANGED_EVENT, syncDefaultMode)
+    return () => {
+      window.removeEventListener(SETTINGS_CHANGED_EVENT, syncDefaultMode)
+    }
+  }, [])
 
   const urlReady = url.trim().length > 0
 
@@ -74,21 +87,6 @@ export function ImportDesk({
       <div className="import-mode" role="radiogroup" aria-label={t.importModeAria}>
         <label
           className={
-            mode === 'web' ? 'import-mode__choice import-mode__choice--active' : 'import-mode__choice'
-          }
-        >
-          <input
-            className="visually-hidden"
-            type="radio"
-            name={modeName}
-            value="web"
-            checked={mode === 'web'}
-            onChange={() => setMode('web')}
-          />
-          {t.importModeWeb}
-        </label>
-        <label
-          className={
             mode === 'upload' ? 'import-mode__choice import-mode__choice--active' : 'import-mode__choice'
           }
         >
@@ -101,6 +99,21 @@ export function ImportDesk({
             onChange={() => setMode('upload')}
           />
           {t.importModeUpload}
+        </label>
+        <label
+          className={
+            mode === 'web' ? 'import-mode__choice import-mode__choice--active' : 'import-mode__choice'
+          }
+        >
+          <input
+            className="visually-hidden"
+            type="radio"
+            name={modeName}
+            value="web"
+            checked={mode === 'web'}
+            onChange={() => setMode('web')}
+          />
+          {t.importModeWeb}
         </label>
       </div>
 
