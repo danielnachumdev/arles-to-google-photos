@@ -45,23 +45,26 @@ class ArtifactStoreSuite(TmpPathSuite):
 
         root = self.artifacts.local_root("job-1")
         assert returned == root
-        assert (root / "hrimages" / "a.jpg").read_bytes() == self.JPEG_BYTES
         assert (root / "index.html").read_bytes() == self.HTML_BYTES
+        assert self.artifacts.exists("job-1", "hrimages/a.jpg")
+        assert (
+            self.artifacts.ensure_file("job-1", "hrimages/a.jpg").read_bytes()
+            == self.JPEG_BYTES
+        )
 
     def test_put_writes_single_file(self) -> None:
         self.artifacts.put("job-1", "imagepages/a.html", self.HTML_BYTES)
         assert self.artifacts.exists("job-1", "imagepages/a.html")
-        assert self.artifacts.local_root("job-1").joinpath(
-            "imagepages", "a.html"
+        assert self.artifacts.ensure_file(
+            "job-1", "imagepages/a.html"
         ).read_bytes() == self.HTML_BYTES
 
     def test_materialize_applies_last_modified(self) -> None:
         stamp = datetime(2012, 8, 2, 12, 0, 0).timestamp()
         self.artifacts.materialize("job-1", [("hrimages/a.jpg", self.JPEG_BYTES, stamp)])
 
-        got = FileTimeService().get(
-            str(self.artifacts.local_root("job-1") / "hrimages" / "a.jpg")
-        )
+        path = self.artifacts.ensure_file("job-1", "hrimages/a.jpg")
+        got = FileTimeService().get(str(path))
         assert got.modification is not None
         assert abs(got.modification.timestamp() - stamp) <= 2
 

@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 from bs4.element import Tag
 
 from ..progress import ProgressSink, raise_if_cancelled
+from .media_index import media_index_entry
 from .media_kinds import (
     BROWSER_PLAYABLE_VIDEO,
     IMAGE_EXTENSIONS,
@@ -611,12 +612,19 @@ class AlbumExportParser:
         if kind == KIND_VIDEO:
             thumb_relpath = _find_thumb_relpath(root, item_id)
             play_relpath = _find_play_relpath(root, item_id, relpath)
+        size_bytes = int(stat.st_size)
+        mtime = float(stat.st_mtime)
+        indexed = media_index_entry(root, relpath)
+        if indexed is not None:
+            size_bytes = int(indexed.size_bytes)
+            if indexed.mtime is not None:
+                mtime = float(indexed.mtime)
         return PreviewItem(
             id=item_id,
             relpath=relpath,
             caption=caption,
-            size_bytes=stat.st_size,
-            last_modified=datetime.fromtimestamp(stat.st_mtime),
+            size_bytes=size_bytes,
+            last_modified=datetime.fromtimestamp(mtime),
             taken_on=_taken_on_from_item_id(item_id),
             kind=kind,
             thumb_relpath=thumb_relpath,

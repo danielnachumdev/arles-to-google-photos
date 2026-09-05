@@ -68,7 +68,40 @@ class TestGcsArtifactStore(ArtifactStoreSuite):
 
         root = self.artifacts.local_root("job-1")
         assert (root / "index.html").read_bytes() == self.HTML_BYTES
-        assert (root / "hrimages" / "a.jpg").read_bytes() == self.JPEG_BYTES
+        # Media is a placeholder until ensure_file
+        assert (root / "hrimages" / "a.jpg").is_file()
+        assert (root / "hrimages" / "a.jpg").stat().st_size == 0
+        assert (
+            self.artifacts.ensure_file("job-1", "hrimages/a.jpg").read_bytes()
+            == self.JPEG_BYTES
+        )
+
+    def test_materialize_discards_media_from_local_cache(self) -> None:
+        self.artifacts.materialize(
+            "job-1",
+            [
+                ("index.html", self.HTML_BYTES, None),
+                ("hrimages/a.jpg", self.JPEG_BYTES, None),
+            ],
+        )
+        cache = self.tmp_path / "job-1"
+        assert (cache / "index.html").read_bytes() == self.HTML_BYTES
+        # Placeholder remains (empty) so the parser can see membership.
+        assert (cache / "hrimages" / "a.jpg").is_file()
+        assert (cache / "hrimages" / "a.jpg").stat().st_size == 0
+        assert self.artifacts.exists("job-1", "hrimages/a.jpg")
+
+    def test_ensure_file_downloads_one_object(self) -> None:
+        self.artifacts.put("job-1", "hrimages/a.jpg", self.JPEG_BYTES)
+        before = self.gcs.download_to_filename_calls
+        path = self.artifacts.ensure_file("job-1", "hrimages/a.jpg")
+        assert path.read_bytes() == self.JPEG_BYTES
+        assert self.gcs.download_to_filename_calls == before + 1
+        # Second call uses warm cache (non-empty file)
+        before = self.gcs.download_to_filename_calls
+        again = self.artifacts.ensure_file("job-1", "hrimages/a.jpg")
+        assert again.read_bytes() == self.JPEG_BYTES
+        assert self.gcs.download_to_filename_calls == before
 
     def test_local_root_hydrate_false_skips_download(self) -> None:
         self.artifacts.materialize(
@@ -132,6 +165,9 @@ class TestGcsArtifactStore(ArtifactStoreSuite):
         self.artifacts.put("job-1", "job.json", b"{}")
         assert not self.gcs.bucket("test-bucket").blob("jobs/job-1/job.json").exists()
         assert (self.tmp_path / "job-1" / "job.json").read_bytes() == b"{}"
+
+    def test_retains_full_local_tree_is_false(self) -> None:
+        assert self.artifacts.retains_full_local_tree is False
 
     def test_ensure_job_creates_cache_dir(self) -> None:
         self.artifacts.ensure_job("job-1")

@@ -33,6 +33,24 @@ class FsArtifactStore(ArtifactStore):
             job_id, [(relpath, data, last_modified_ts)], owner_id=owner_id
         )
 
+    def put_file(
+        self,
+        job_id: str,
+        relpath: str,
+        path: Path,
+        last_modified_ts: Optional[float] = None,
+        *,
+        owner_id: Optional[str] = None,
+    ) -> None:
+        root = self.local_root(job_id, owner_id=owner_id, hydrate=False)
+        dest = JobWorkspace(root)._resolve_inside_root(relpath)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copyfile(path, dest)
+        if last_modified_ts is not None:
+            import os
+
+            os.utime(dest, (last_modified_ts, last_modified_ts))
+
     def materialize(
         self,
         job_id: str,
@@ -42,6 +60,19 @@ class FsArtifactStore(ArtifactStore):
     ) -> Path:
         root = self.local_root(job_id, owner_id=owner_id)
         return JobWorkspace(root).materialize(files)
+
+    def ensure_file(
+        self,
+        job_id: str,
+        relpath: str,
+        *,
+        owner_id: Optional[str] = None,
+    ) -> Path:
+        root = self.local_root(job_id, owner_id=owner_id, hydrate=False)
+        dest = JobWorkspace(root)._resolve_inside_root(relpath)
+        if not dest.is_file():
+            raise FileNotFoundError(relpath)
+        return dest
 
     def delete_job(self, job_id: str, *, owner_id: Optional[str] = None) -> None:
         root = self.local_root(job_id, owner_id=owner_id).resolve()

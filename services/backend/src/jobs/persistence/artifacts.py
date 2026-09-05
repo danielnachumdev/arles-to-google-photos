@@ -15,6 +15,7 @@ STATE_FILE_NAMES = frozenset(
         "events.json",
         "job.json.tmp",
         "events.json.tmp",
+        "arles-media-index.json",
     }
 )
 
@@ -24,12 +25,18 @@ class ArtifactStore(ABC):
 
     ``local_root`` returns a local directory the parser / publisher can use.
     Filesystem backends use ``{JOBS_ROOT}/{job_id}/`` directly. The GCS
-    backend hydrates/caches objects there (``JOBS_ROOT`` is not the bucket).
+    backend hydrates a *sparse* scratch pad there (HTML + media placeholders);
+    call ``ensure_file`` for real media bytes (preview UI / publish).
 
     Optional ``owner_id`` scopes remote object keys (GCS) under
     ``{prefix}/users/{owner_id}/{job_id}/`` so tenants do not share prefixes.
     Local cache dirs stay ``{JOBS_ROOT}/{job_id}/`` (job ids are globally unique).
     """
+
+    @property
+    def retains_full_local_tree(self) -> bool:
+        """True when materialize keeps every file on local disk (FS backend)."""
+        return True
 
     @abstractmethod
     def ensure_job(self, job_id: str, *, owner_id: Optional[str] = None) -> None:
@@ -47,6 +54,24 @@ class ArtifactStore(ABC):
     ) -> None:
         """Write one relative path. Rejects ``..`` / absolute paths."""
 
+    def put_file(
+        self,
+        job_id: str,
+        relpath: str,
+        path: Path,
+        last_modified_ts: Optional[float] = None,
+        *,
+        owner_id: Optional[str] = None,
+    ) -> None:
+        """Stream one local file into durable storage (default: read + ``put``)."""
+        self.put(
+            job_id,
+            relpath,
+            Path(path).read_bytes(),
+            last_modified_ts,
+            owner_id=owner_id,
+        )
+
     @abstractmethod
     def materialize(
         self,
@@ -56,6 +81,16 @@ class ArtifactStore(ABC):
         owner_id: Optional[str] = None,
     ) -> Path:
         """Write many files. Returns the local filesystem root for this job."""
+
+    @abstractmethod
+    def ensure_file(
+        self,
+        job_id: str,
+        relpath: str,
+        *,
+        owner_id: Optional[str] = None,
+    ) -> Path:
+        """Ensure one artifact exists locally with real bytes; return its path."""
 
     @abstractmethod
     def delete_job(self, job_id: str, *, owner_id: Optional[str] = None) -> None:
@@ -71,9 +106,9 @@ class ArtifactStore(ABC):
     ) -> Path:
         """Local directory for this job.
 
-        When ``hydrate`` is True (default), remote backends fill the cache from
-        object storage. Pass ``hydrate=False`` for cheap path resolution (e.g.
-        JobStore boot) so Cloud Run does not download every album before bind.
+        When ``hydrate`` is True (default), remote backends fill a parse-ready
+        scratch pad from object storage (not necessarily every media body).
+        Pass ``hydrate=False`` for cheap path resolution (e.g. JobStore boot).
         """
 
     @abstractmethod

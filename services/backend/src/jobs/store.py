@@ -767,10 +767,10 @@ class JobStore:
         return job
 
     def ensure_local_root(self, job_id: str) -> Path:
-        """Hydrate album files into the local cache; update ``job.root``.
+        """Hydrate a parse-ready album scratch pad; update ``job.root``.
 
-        Call before parse / publish / media serve. Cheap when the cache is warm
-        or the backend is filesystem-only.
+        Remote (GCS) backends hydrate HTML + media placeholders, not full
+        media bodies. Use ``ensure_artifact_file`` for real bytes.
         """
         with self._lock:
             job = self._require(job_id)
@@ -782,6 +782,39 @@ class JobStore:
         with self._lock:
             self._require(job_id).root = root
         return root
+
+    def ensure_artifact_file(self, job_id: str, relpath: str) -> Path:
+        """Ensure one album file exists locally with real bytes."""
+        with self._lock:
+            job = self._require(job_id)
+            artifact_id = job.source_job_id or job.id
+            owner_id = job.owner_id
+        return self._require_artifacts().ensure_file(
+            artifact_id, relpath, owner_id=owner_id
+        )
+
+    def put_album_file(
+        self,
+        job_id: str,
+        relpath: str,
+        path: Path,
+        mtime: Optional[float] = None,
+    ) -> None:
+        """Stream one local file into the job's durable artifact store."""
+        with self._lock:
+            job = self._require(job_id)
+            artifact_id = job.source_job_id or job.id
+            owner_id = job.owner_id
+        self._require_artifacts().put_file(
+            artifact_id,
+            relpath,
+            Path(path),
+            mtime,
+            owner_id=owner_id,
+        )
+
+    def retains_full_local_tree(self) -> bool:
+        return self._require_artifacts().retains_full_local_tree
 
     def materialize_album(
         self,

@@ -13,10 +13,28 @@ class FakeBlob:
         store: Dict[str, bytes],
         name: str,
         client: Optional["FakeGcsClient"] = None,
+        meta_store: Optional[Dict[str, Dict[str, str]]] = None,
     ) -> None:
         self._store = store
         self.name = name
         self._client = client
+        self._meta_store = meta_store if meta_store is not None else {}
+
+    @property
+    def metadata(self) -> Dict[str, str]:
+        return dict(self._meta_store.get(self.name, {}))
+
+    @metadata.setter
+    def metadata(self, value: Optional[Dict[str, str]]) -> None:
+        if not value:
+            self._meta_store.pop(self.name, None)
+        else:
+            self._meta_store[self.name] = dict(value)
+
+    @property
+    def size(self) -> int:
+        data = self._store.get(self.name)
+        return 0 if data is None else len(data)
 
     def upload_from_string(self, data: object, **_kwargs: object) -> None:
         if isinstance(data, bytes):
@@ -51,6 +69,7 @@ class FakeBlob:
 
     def delete(self, **_kwargs: object) -> None:
         self._store.pop(self.name, None)
+        self._meta_store.pop(self.name, None)
 
 
 class FakeBucket:
@@ -61,18 +80,22 @@ class FakeBucket:
         blobs: Dict[str, bytes],
         name: str,
         client: Optional["FakeGcsClient"] = None,
+        meta: Optional[Dict[str, Dict[str, str]]] = None,
     ) -> None:
         self.name = name
         self._blobs = blobs
         self._client = client
+        self._meta = meta if meta is not None else {}
 
     def blob(self, name: str) -> FakeBlob:
-        return FakeBlob(self._blobs, name, client=self._client)
+        return FakeBlob(self._blobs, name, client=self._client, meta_store=self._meta)
 
     def list_blobs(self, prefix: str = "", **_kwargs: object) -> Iterator[FakeBlob]:
         for name in list(self._blobs):
             if name.startswith(prefix):
-                yield FakeBlob(self._blobs, name, client=self._client)
+                yield FakeBlob(
+                    self._blobs, name, client=self._client, meta_store=self._meta
+                )
 
     def copy_blob(
         self,
@@ -83,7 +106,9 @@ class FakeBucket:
     ) -> FakeBlob:
         dest = new_name or blob.name
         self._blobs[dest] = self._blobs[blob.name]
-        return FakeBlob(self._blobs, dest, client=self._client)
+        if blob.name in self._meta:
+            self._meta[dest] = dict(self._meta[blob.name])
+        return FakeBlob(self._blobs, dest, client=self._client, meta_store=self._meta)
 
 
 class FakeGcsClient:
@@ -91,14 +116,20 @@ class FakeGcsClient:
 
     def __init__(self) -> None:
         self._buckets: Dict[str, Dict[str, bytes]] = {}
+        self._meta: Dict[str, Dict[str, Dict[str, str]]] = {}
         self.upload_from_filename_calls = 0
         self.download_to_filename_calls = 0
 
     def bucket(self, name: str) -> FakeBucket:
         self._buckets.setdefault(name, {})
-        return FakeBucket(self._buckets[name], name, client=self)
+        self._meta.setdefault(name, {})
+        return FakeBucket(
+            self._buckets[name], name, client=self, meta=self._meta[name]
+        )
 
-    def list_blobs(self, bucket_or_name: object, prefix: str = "", **_kwargs: object) -> Iterator[FakeBlob]:
+    def list_blobs(
+        self, bucket_or_name: object, prefix: str = "", **_kwargs: object
+    ) -> Iterator[FakeBlob]:
         if isinstance(bucket_or_name, str):
             name = bucket_or_name
         else:
