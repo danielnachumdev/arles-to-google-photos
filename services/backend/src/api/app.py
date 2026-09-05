@@ -108,6 +108,8 @@ def create_app(
         events=events,
         workspace=JobWorkspace,
         auto_publisher=auto_publisher,
+        jobs_root=root,
+        submit=orchestrator.submit,
     )
     album_scraper = scraper if scraper is not None else load_default_scraper()
     scrape = ScrapeService(

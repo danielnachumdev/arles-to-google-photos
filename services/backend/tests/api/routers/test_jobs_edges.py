@@ -186,6 +186,72 @@ class TestHistoryAndIngestEdges(ApiClientSuite):
         # Missing imagepages → parse may fail after accept; multipart must parse.
         assert response.status_code in {201, 400}, response.text
 
+    def test_hub_folder_upload_fans_out_leaf_children(self, tmp_path: Path) -> None:
+        api = self.make_api(tmp_path)
+        jpeg = b"\xff\xd8\xff\xd9"
+        files = [
+            (
+                "files",
+                (
+                    "index.html",
+                    b'<!DOCTYPE html><html><head>'
+                    b'<meta http-equiv="refresh" content="0;url=./Aug10/index.html">'
+                    b"</head><body></body></html>",
+                    "text/html",
+                ),
+            ),
+        ]
+        for day, item_id, title in (
+            ("Aug10", "20120810_01", "Aug 10"),
+            ("Aug11", "20120811_01", "Aug 11"),
+        ):
+            files.append(
+                (
+                    "files",
+                    (
+                        f"{day}/index.html",
+                        (
+                            f'<!DOCTYPE html><html><body>'
+                            f'<span class="gallerytitle">{title}</span>'
+                            f'<a href="imagepages/{item_id}.html">'
+                            f'<img src="thumbnails/TN_{item_id}.JPG"></a>'
+                            f"</body></html>"
+                        ).encode("utf-8"),
+                        "text/html",
+                    ),
+                )
+            )
+            files.append(
+                (
+                    "files",
+                    (
+                        f"{day}/imagepages/{item_id}.html",
+                        b'<html><body><div class="imagetitle">shot</div></body></html>',
+                        "text/html",
+                    ),
+                )
+            )
+            files.append(
+                (
+                    "files",
+                    (f"{day}/hrimages/{item_id}hr.JPG", jpeg, "image/jpeg"),
+                )
+            )
+        response = api.client.post("/api/jobs", files=files)
+        assert response.status_code == 201, response.text
+        parent_id = response.json()["id"]
+        parent = api.wait_job(parent_id, status="done")
+        assert "only redirects" not in (parent.get("error") or "")
+        children = api.client.get(f"/api/jobs/{parent_id}/children").json()["jobs"]
+        assert len(children) == 2
+        for child in children:
+            detail = api.wait_job(child["id"], status="done")
+            assert detail["status"] == "done"
+            assert detail["preview"] is not None
+            assert len(detail["preview"]["items"]) == 1
+            assert detail["parent_job_id"] == parent_id
+            assert detail["source_job_id"] == parent_id
+
 
     def test_default_gp_factory_is_invoked_on_publish(self, tmp_path: Path) -> None:
         from src.api.app import create_app

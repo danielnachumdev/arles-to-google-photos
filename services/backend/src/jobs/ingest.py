@@ -258,12 +258,17 @@ class IngestService:
         events: _EventBusLike,
         workspace: Callable[[Path], _WorkspaceLike],
         auto_publisher: Optional[_AutoPublisherLike] = None,
+        *,
+        jobs_root: Optional[Path] = None,
+        submit: Optional[Callable[[str, Callable[[], None]], None]] = None,
     ) -> None:
         self._store = store
         self._parser = parser
         self._events = events
         self._workspace = workspace
         self._auto_publisher = auto_publisher
+        self._jobs_root = Path(jobs_root) if jobs_root is not None else None
+        self._submit = submit
 
     def ingest(
         self,
@@ -331,12 +336,17 @@ class IngestService:
         overwrite: bool = False,
     ) -> str:
         job = self._store.get(job_id)
-        token_key = job_id
+        parent_id = getattr(job, "parent_job_id", None) or job_id
+        token_key = parent_id
         try:
             result_id = self._run(job, files, overwrite=overwrite)
-            if self._auto_publisher is not None:
+            result = self._store.get(result_id)
+            if (
+                self._auto_publisher is not None
+                and getattr(result, "preview", None) is not None
+            ):
                 self._auto_publisher.after_preview(
-                    result_id, parent_id=result_id, token_key=token_key
+                    result_id, parent_id=parent_id, token_key=token_key
                 )
             return result_id
         except AlbumExistsError:
@@ -388,12 +398,17 @@ class IngestService:
     def finish_prepared(self, job_id: str, *, overwrite: bool = False) -> str:
         """Parse a job whose album files were already streamed into ArtifactStore."""
         job = self._store.get(job_id)
-        token_key = job_id
+        parent_id = getattr(job, "parent_job_id", None) or job_id
+        token_key = parent_id
         try:
             result_id = self._run_prepared(job, overwrite=overwrite)
-            if self._auto_publisher is not None:
+            result = self._store.get(result_id)
+            if (
+                self._auto_publisher is not None
+                and getattr(result, "preview", None) is not None
+            ):
                 self._auto_publisher.after_preview(
-                    result_id, parent_id=result_id, token_key=token_key
+                    result_id, parent_id=parent_id, token_key=token_key
                 )
             return result_id
         except AlbumExistsError:
@@ -451,7 +466,7 @@ class IngestService:
         )
         if store_is_cancelled(self._store, job.id):
             raise JobCancelled()
-        return self._parse_and_complete(
+        return self._detect_and_complete(
             job, overwrite=overwrite, overwrite_files=overwrite_files
         )
 
@@ -460,15 +475,59 @@ class IngestService:
             self._store.set_status(job.id, STATUS_RUNNING, job_type=TYPE_PREVIEW)
         if store_is_cancelled(self._store, job.id):
             raise JobCancelled()
-        root = self._store.ensure_local_root(job.id)
-        # Progress: files already durable; signal write complete then parse.
         self._events.emit(
             job.id, "ingest", "Upload written", current=1, total=1
         )
         if store_is_cancelled(self._store, job.id):
             raise JobCancelled()
-        del root
-        return self._parse_and_complete(job, overwrite=overwrite, overwrite_files=())
+        return self._detect_and_complete(job, overwrite=overwrite, overwrite_files=())
+
+    def _detect_and_complete(
+        self,
+        job: _JobLike,
+        *,
+        overwrite: bool,
+        overwrite_files: Iterable[tuple[str, bytes, Optional[float]]],
+    ) -> str:
+        from .folder_hub import (
+            FolderAlbumKind,
+            FolderHubDetector,
+            album_relpath_of,
+        )
+
+        root = self._store.ensure_local_root(job.id)
+        # Shared-artifact children already point at a leaf subpath — parse only.
+        if album_relpath_of(job):
+            return self._parse_and_complete(
+                job, overwrite=overwrite, overwrite_files=overwrite_files
+            )
+        plan = FolderHubDetector().detect(root)
+        if plan.kind == FolderAlbumKind.HUB and plan.child_relpaths:
+            return self._fan_out_hub(job, plan)
+        return self._parse_and_complete(
+            job, overwrite=overwrite, overwrite_files=overwrite_files
+        )
+
+    def _fan_out_hub(self, job: _JobLike, plan: Any) -> str:
+        from .folder_hub import FolderHubFanOut
+
+        jobs_root = self._jobs_root
+        if jobs_root is None:
+            jobs_root = Path(job.root).parent
+        submit = self._submit
+        if submit is None:
+
+            def submit(job_id: str, fn: Callable[[], None]) -> None:
+                fn()
+
+        FolderHubFanOut(
+            store=self._store,  # type: ignore[arg-type]
+            jobs_root=jobs_root,
+            submit=submit,
+            run_child=lambda cid: self.finish_prepared(cid),
+            events_emit=self._events.emit,
+        ).apply(job.id, plan)
+        return job.id
 
     def _parse_and_complete(
         self,
