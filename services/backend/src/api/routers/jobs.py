@@ -1,11 +1,12 @@
 """Job CRUD, media, and reprocess routes."""
 from __future__ import annotations
 
+import json
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Iterator, List, Optional
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from starlette.datastructures import FormData
 
 from ...export.editor import PreviewEdits
@@ -50,6 +51,7 @@ router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 # for album ingest only (parsed via request.form, not File()/Form() defaults).
 MULTIPART_MAX_FILES = 10_000
 MULTIPART_MAX_FIELDS = 10_000
+NDJSON_ACCEPT = "application/x-ndjson"
 
 
 async def _album_upload_form(request: Request) -> FormData:
@@ -75,32 +77,15 @@ def _form_optional_str(form: FormData, key: str) -> Optional[str]:
     return str(raw)
 
 
-@router.post("", status_code=201)
-async def create_job(
-    overwrite: bool = Query(False),
-    auto_publish: bool = Query(False),
-    form: FormData = Depends(_album_upload_form),
-    deps: ApiDependencies = Depends(get_deps),
-    user: UserRecord = Depends(get_current_user),
-) -> Dict[str, Any]:
-    """Ingest an uploaded album tree.
+def _wants_ndjson_progress(request: Request) -> bool:
+    accept = (request.headers.get("accept") or "").lower()
+    return NDJSON_ACCEPT in accept
 
-    ``overwrite`` defaults to false. Same gallery title without overwrite → 409
-    ``{"detail": {"code": "album_exists", "existing_id": "...", "title": "..."}}``.
-    ``overwrite=true`` folds into the existing job (keeps id / created_at /
-    product_url).
 
-    Each multipart part is streamed into durable storage one file at a time
-    (no full album staging tree on local disk).
-    """
+def _album_parts_from_form(form: FormData) -> List[AlbumUploadPart]:
     files = _form_uploads(form)
     if not files:
         raise HTTPException(status_code=400, detail="files required")
-    access_token = _form_optional_str(form, "access_token")
-    if auto_publish and not (access_token or "").strip():
-        raise HTTPException(
-            status_code=400, detail="google access token required"
-        )
     mtimes = [
         None if hasattr(value, "filename") else value
         for value in form.getlist("lastModified")
@@ -118,32 +103,126 @@ async def create_job(
                 mtime=stamp,
             )
         )
+    return parts
+
+
+def _album_exists_http(exc: AlbumExistsError) -> HTTPException:
+    return HTTPException(
+        status_code=409,
+        detail={
+            "code": "album_exists",
+            "existing_id": exc.existing_id,
+            "title": exc.title,
+        },
+    )
+
+
+@router.post("", status_code=201, response_model=None)
+async def create_job(
+    request: Request,
+    overwrite: bool = Query(False),
+    auto_publish: bool = Query(False),
+    form: FormData = Depends(_album_upload_form),
+    deps: ApiDependencies = Depends(get_deps),
+    user: UserRecord = Depends(get_current_user),
+) -> Any:
+    """Ingest an uploaded album tree.
+
+    ``overwrite`` defaults to false. Same gallery title without overwrite → 409
+    ``{"detail": {"code": "album_exists", "existing_id": "...", "title": "..."}}``.
+    ``overwrite=true`` folds into the existing job (keeps id / created_at /
+    product_url).
+
+    Each multipart part is streamed into durable storage one file at a time
+    (no full album staging tree on local disk). With
+    ``Accept: application/x-ndjson``, the response streams ``store`` progress
+    lines then a final ``done`` event with the job; otherwise a single JSON job
+    body is returned after storage completes. Preview prep is always enqueued
+    on the job orchestrator before the response finishes.
+    """
+    parts = _album_parts_from_form(form)
+    access_token = _form_optional_str(form, "access_token")
+    if auto_publish and not (access_token or "").strip():
+        raise HTTPException(
+            status_code=400, detail="google access token required"
+        )
     ingress = MultipartAlbumIngress(
         store=deps.store,
         ingest=deps.ingest,
         jobs_root=deps.jobs_root,
         submit=deps.orchestrator.submit,
+        events_emit=deps.events.emit,
+    )
+    if not _wants_ndjson_progress(request):
+        try:
+            job_id = ingress.ingest(
+                parts,
+                overwrite=overwrite,
+                auto_publish=auto_publish,
+                access_token=access_token,
+                owner_id=user.id,
+            )
+        except AlbumExistsError as exc:
+            raise _album_exists_http(exc) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+        return deps.store.detail_dict(job_id, owner_id=user.id)
+
+    events = ingress.iter_ingest(
+        parts,
+        overwrite=overwrite,
+        auto_publish=auto_publish,
+        access_token=access_token,
+        owner_id=user.id,
     )
     try:
-        job_id = ingress.ingest(
-            parts,
-            overwrite=overwrite,
-            auto_publish=auto_publish,
-            access_token=access_token,
-            owner_id=user.id,
-        )
+        first = next(events)
     except AlbumExistsError as exc:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "code": "album_exists",
-                "existing_id": exc.existing_id,
-                "title": exc.title,
-            },
-        ) from exc
+        raise _album_exists_http(exc) from exc
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return deps.store.detail_dict(job_id, owner_id=user.id)
+    except StopIteration as exc:
+        raise HTTPException(status_code=500, detail="empty ingest") from exc
+
+    def _done_line(job_id: str) -> str:
+        detail = deps.store.detail_dict(job_id, owner_id=user.id)
+        return json.dumps({"event": "done", "job": detail}) + "\n"
+
+    def _ndjson_body() -> Iterator[str]:
+        if first.get("event") == "complete":
+            yield _done_line(str(first.get("job_id") or ""))
+            return
+        yield json.dumps(first) + "\n"
+        job_id: Optional[str] = (
+            str(first.get("job_id")) if first.get("job_id") else None
+        )
+        try:
+            for event in events:
+                if event.get("event") == "complete":
+                    yield _done_line(str(event.get("job_id") or job_id or ""))
+                    return
+                yield json.dumps(event) + "\n"
+            if job_id:
+                yield _done_line(job_id)
+        except AlbumExistsError as exc:
+            yield json.dumps(
+                {
+                    "event": "error",
+                    "detail": {
+                        "code": "album_exists",
+                        "existing_id": exc.existing_id,
+                        "title": exc.title,
+                    },
+                }
+            ) + "\n"
+        except Exception as exc:
+            yield json.dumps({"event": "error", "detail": str(exc)}) + "\n"
+
+    return StreamingResponse(
+        _ndjson_body(),
+        media_type=NDJSON_ACCEPT,
+        status_code=201,
+    )
 
 
 @router.get("")

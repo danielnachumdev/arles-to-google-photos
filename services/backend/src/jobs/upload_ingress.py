@@ -1,4 +1,4 @@
-"""Streaming multipart album ingress: one part at a time into ArtifactStore.
+"""Streaming multipart album ingress: one file at a time into ArtifactStore.
 
 Avoids a full local staging tree (Cloud Run local disk ≈ memory). Title is
 peeked from ``index.html`` among the parts; each part is copied to a temp file,
@@ -10,9 +10,21 @@ import os
 import tempfile
 from dataclasses import dataclass
 from pathlib import Path
-from typing import BinaryIO, Callable, Iterable, Optional, Protocol, Sequence
+from typing import (
+    Any,
+    BinaryIO,
+    Callable,
+    Dict,
+    Iterable,
+    Iterator,
+    Optional,
+    Protocol,
+    Sequence,
+)
 
 from .ingest import peek_gallery_title
+
+STORE_MESSAGE = "Storing files"
 
 
 @dataclass
@@ -54,6 +66,7 @@ class _StoreLike(Protocol):
 
 
 SubmitFn = Callable[[str, Callable[[], None]], None]
+EventsEmitFn = Callable[..., Any]
 
 
 def peek_gallery_title_from_parts(
@@ -88,11 +101,13 @@ class MultipartAlbumIngress:
         ingest: _IngestLike,
         jobs_root: Path,
         submit: SubmitFn,
+        events_emit: Optional[EventsEmitFn] = None,
     ) -> None:
         self._store = store
         self._ingest = ingest
         self._jobs_root = Path(jobs_root)
         self._submit = submit
+        self._emit = events_emit
 
     def ingest(
         self,
@@ -103,6 +118,32 @@ class MultipartAlbumIngress:
         access_token: Optional[str] = None,
         owner_id: Optional[str] = None,
     ) -> str:
+        job_id = ""
+        for event in self.iter_ingest(
+            parts,
+            overwrite=overwrite,
+            auto_publish=auto_publish,
+            access_token=access_token,
+            owner_id=owner_id,
+        ):
+            if event.get("event") == "complete":
+                job_id = str(event.get("job_id") or "")
+        return job_id
+
+    def iter_ingest(
+        self,
+        parts: Sequence[AlbumUploadPart],
+        *,
+        overwrite: bool = False,
+        auto_publish: bool = False,
+        access_token: Optional[str] = None,
+        owner_id: Optional[str] = None,
+    ) -> Iterator[Dict[str, Any]]:
+        """Store parts one-by-one, yield progress, then enqueue preview prep.
+
+        Yields ``store`` events (current/total) and a final ``complete`` with
+        ``job_id``. Preview parse runs via ``submit(finish_prepared)``.
+        """
         title = peek_gallery_title_from_parts(parts)
         job_id = self._ingest.start(
             (),
@@ -113,9 +154,18 @@ class MultipartAlbumIngress:
             owner_id=owner_id,
             title=title,
         )
+        total = len(parts)
         try:
-            for part in parts:
+            for index, part in enumerate(parts, start=1):
                 self._accept_part(job_id, part)
+                self._emit_store_progress(job_id, index, total)
+                yield {
+                    "event": "store",
+                    "job_id": job_id,
+                    "current": index,
+                    "total": total,
+                    "message": STORE_MESSAGE,
+                }
         except Exception:
             # Best-effort: caller / start already created the job; leave cleanup
             # to normal failed-job paths. Do not keep partial staging dirs.
@@ -128,7 +178,18 @@ class MultipartAlbumIngress:
                 job_id, overwrite=overwrite_flag
             ),
         )
-        return job_id
+        yield {"event": "complete", "job_id": job_id}
+
+    def _emit_store_progress(self, job_id: str, current: int, total: int) -> None:
+        if self._emit is None:
+            return
+        self._emit(
+            job_id,
+            "ingest",
+            STORE_MESSAGE,
+            current=current,
+            total=total,
+        )
 
     def _accept_part(self, job_id: str, part: AlbumUploadPart) -> None:
         fd, name = tempfile.mkstemp(prefix="arles-part-", dir=str(self._jobs_root))

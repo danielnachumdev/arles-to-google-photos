@@ -230,6 +230,9 @@ export const he: MessageCatalog = {
 
   sendingFiles: (n) => `מעלה ${n} קבצים לשרת…`,
   sendingFilesProgress: (n, percent) => `מעלה ${n} קבצים לשרת… ${percent}%`,
+  storingFiles: 'שומר קבצים בשרת…',
+  storingFilesProgress: (current, total, percent) =>
+    `שומר קבצים בשרת… ${current}/${total} (${percent}%)`,
   uploadProgressLabel: (percent, loaded, total) =>
     total ? `${percent}% · ${loaded} / ${total}` : `${percent}%`,
   previewReady: 'התצוגה המקדימה מוכנה.',

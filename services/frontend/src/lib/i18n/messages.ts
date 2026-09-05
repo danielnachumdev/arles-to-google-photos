@@ -181,6 +181,8 @@ export type MessageCatalog = {
 
   sendingFiles: (n: number) => string
   sendingFilesProgress: (n: number, percent: number) => string
+  storingFiles: string
+  storingFilesProgress: (current: number, total: number, percent: number) => string
   uploadProgressLabel: (percent: number, loaded: string, total: string) => string
   previewReady: string
   saved: string

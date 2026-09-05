@@ -17,9 +17,13 @@ import type {
   ScrapeJobRequest,
 } from './types.ts'
 import { apiErrorFromHttp } from '../lib/formatApiError.ts'
-import { postFormData, type UploadProgressEvent } from './xhrFormPost.ts'
+import {
+  postFormData,
+  type StoreProgressEvent,
+  type UploadProgressEvent,
+} from './xhrFormPost.ts'
 
-export type { UploadProgressEvent }
+export type { StoreProgressEvent, UploadProgressEvent }
 
 export class AlbumExistsError extends Error {
   readonly existingId: string
@@ -71,6 +75,7 @@ export class MigrationClient {
       autoPublish?: boolean
       accessToken?: string
       onUploadProgress?: (event: UploadProgressEvent) => void
+      onStoreProgress?: (event: StoreProgressEvent) => void
     },
   ): Promise<Job> {
     const form = new FormData()
@@ -111,6 +116,8 @@ export class MigrationClient {
     const query = params.toString() ? `?${params.toString()}` : ''
     const { status, bodyText } = await postFormData(`${this.baseUrl}/jobs${query}`, form, {
       onProgress: options?.onUploadProgress,
+      onStoreProgress: options?.onStoreProgress,
+      streamStoreProgress: true,
     })
 
     if (status === 409) {

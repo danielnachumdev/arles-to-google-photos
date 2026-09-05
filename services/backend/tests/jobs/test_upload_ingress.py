@@ -115,6 +115,40 @@ class TestMultipartAlbumIngress:
             == jpeg
         )
 
+    def test_iter_ingest_yields_store_progress_then_complete(
+        self, tmp_path: Path
+    ) -> None:
+        store = MagicMock()
+        ingest = MagicMock()
+        ingest.start.return_value = "job-1"
+        ingest.finish_prepared.return_value = "job-1"
+        emitted: list = []
+
+        def emit(job_id: str, stage: str, message: str = "", **kwargs) -> None:
+            emitted.append((job_id, stage, message, kwargs))
+
+        ingress = MultipartAlbumIngress(
+            store=store,
+            ingest=ingest,
+            jobs_root=tmp_path,
+            submit=lambda _jid, fn: fn(),
+            events_emit=emit,
+        )
+        parts = [
+            AlbumUploadPart("index.html", io.BytesIO(b"<html></html>"), None),
+            AlbumUploadPart("a.jpg", io.BytesIO(b"\xff\xd8"), None),
+        ]
+        events = list(ingress.iter_ingest(parts, owner_id="o"))
+        assert [e["event"] for e in events] == ["store", "store", "complete"]
+        assert events[0]["current"] == 1 and events[0]["total"] == 2
+        assert events[1]["current"] == 2 and events[1]["total"] == 2
+        assert events[2]["job_id"] == "job-1"
+        assert store.put_album_file.call_count == 2
+        assert len(emitted) == 2
+        assert emitted[0][0] == "job-1"
+        assert emitted[0][2] == "Storing files"
+        assert emitted[1][3]["current"] == 2
+
     def test_album_exists_propagates_before_any_put(self, tmp_path: Path) -> None:
         from src.jobs.ingest import AlbumExistsError
 

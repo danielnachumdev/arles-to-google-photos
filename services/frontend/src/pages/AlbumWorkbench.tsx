@@ -1,6 +1,11 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react'
 import { Link, useBlocker, useNavigate } from 'react-router-dom'
-import { AlbumExistsError, MigrationClient, type UploadProgressEvent } from '../api/client.ts'
+import {
+  AlbumExistsError,
+  MigrationClient,
+  type StoreProgressEvent,
+  type UploadProgressEvent,
+} from '../api/client.ts'
 import { JobEventSource } from '../api/events.ts'
 import type { Job, JobEvent, JobType, ReprocessOptions } from '../api/types.ts'
 import { CancelJobDialog } from '../components/CancelJobDialog.tsx'
@@ -30,6 +35,10 @@ const client = new MigrationClient()
 const events = new JobEventSource()
 
 type Phase = 'pick' | 'working' | 'preview' | 'failed'
+
+type TransferProgress =
+  | ({ phase: 'upload' } & UploadProgressEvent)
+  | ({ phase: 'store' } & StoreProgressEvent)
 
 function formatUploadBytes(bytes: number): string {
   if (!Number.isFinite(bytes) || bytes < 0) {
@@ -79,7 +88,7 @@ export function AlbumWorkbench({
   const [folderLabel, setFolderLabel] = useState('')
   const [phase, setPhase] = useState<Phase>(jobId ? 'working' : 'pick')
   const [statusLine, setStatusLine] = useState(jobId ? t.loadingAlbum : '')
-  const [uploadProgress, setUploadProgress] = useState<UploadProgressEvent | null>(null)
+  const [uploadProgress, setUploadProgress] = useState<TransferProgress | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [notFound, setNotFound] = useState(false)
   const [job, setJob] = useState<Job | null>(null)
@@ -388,7 +397,7 @@ export function AlbumWorkbench({
     const pending = pendingImportRef.current
     setPhase('working')
     setError(null)
-    setUploadProgress({ loaded: 0, total: 0, percent: 0 })
+    setUploadProgress({ phase: 'upload', loaded: 0, total: 0, percent: 0 })
     setStatusLine(t.sendingFiles(payload.length))
     try {
       const created = await client.createJob(payload, {
@@ -396,11 +405,19 @@ export function AlbumWorkbench({
         autoPublish: pending?.autoPublish,
         accessToken: pending?.accessToken,
         onUploadProgress: (event) => {
-          setUploadProgress(event)
+          setUploadProgress({ phase: 'upload', ...event })
           setStatusLine(
             event.total > 0
               ? t.sendingFilesProgress(payload.length, event.percent)
               : t.sendingFiles(payload.length),
+          )
+        },
+        onStoreProgress: (event) => {
+          setUploadProgress({ phase: 'store', ...event })
+          setStatusLine(
+            event.total > 0
+              ? t.storingFilesProgress(event.current, event.total, event.percent)
+              : t.storingFiles,
           )
         },
       })
@@ -793,11 +810,19 @@ export function AlbumWorkbench({
               aria-valuemin={0}
               aria-valuemax={100}
               aria-valuenow={uploadProgress.percent}
-              aria-label={t.uploadProgressLabel(
-                uploadProgress.percent,
-                formatUploadBytes(uploadProgress.loaded),
-                uploadProgress.total > 0 ? formatUploadBytes(uploadProgress.total) : '',
-              )}
+              aria-label={
+                uploadProgress.phase === 'store'
+                  ? t.storingFilesProgress(
+                      uploadProgress.current,
+                      uploadProgress.total,
+                      uploadProgress.percent,
+                    )
+                  : t.uploadProgressLabel(
+                      uploadProgress.percent,
+                      formatUploadBytes(uploadProgress.loaded),
+                      uploadProgress.total > 0 ? formatUploadBytes(uploadProgress.total) : '',
+                    )
+              }
             >
               <div className="workbench__upload-progress-track">
                 <div
@@ -806,11 +831,17 @@ export function AlbumWorkbench({
                 />
               </div>
               <span className="workbench__upload-progress-label" dir="ltr">
-                {t.uploadProgressLabel(
-                  uploadProgress.percent,
-                  formatUploadBytes(uploadProgress.loaded),
-                  uploadProgress.total > 0 ? formatUploadBytes(uploadProgress.total) : '',
-                )}
+                {uploadProgress.phase === 'store'
+                  ? t.storingFilesProgress(
+                      uploadProgress.current,
+                      uploadProgress.total,
+                      uploadProgress.percent,
+                    )
+                  : t.uploadProgressLabel(
+                      uploadProgress.percent,
+                      formatUploadBytes(uploadProgress.loaded),
+                      uploadProgress.total > 0 ? formatUploadBytes(uploadProgress.total) : '',
+                    )}
               </span>
             </div>
           ) : null}

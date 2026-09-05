@@ -232,6 +232,8 @@ describe('i18n catalogs', () => {
       expect(catalog.fileCount(3)).toBeTruthy()
       expect(catalog.sendingFiles(3)).toContain('3')
       expect(catalog.sendingFilesProgress(3, 42)).toContain('42')
+      expect(catalog.storingFiles).toBeTruthy()
+      expect(catalog.storingFilesProgress(2, 5, 40)).toContain('2/5')
       expect(catalog.uploadProgressLabel(42, '1 MB', '2 MB')).toContain('42')
       expect(catalog.errorPreview('e')).toContain('e')
       expect(catalog.errorSave('e')).toContain('e')

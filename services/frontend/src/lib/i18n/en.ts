@@ -236,6 +236,9 @@ export const en: MessageCatalog = {
 
   sendingFiles: (n) => `Uploading ${n} files to the server…`,
   sendingFilesProgress: (n, percent) => `Uploading ${n} files to the server… ${percent}%`,
+  storingFiles: 'Saving files on the server…',
+  storingFilesProgress: (current, total, percent) =>
+    `Saving files on the server… ${current}/${total} (${percent}%)`,
   uploadProgressLabel: (percent, loaded, total) =>
     total ? `${percent}% · ${loaded} / ${total}` : `${percent}%`,
   previewReady: 'Preview is ready.',

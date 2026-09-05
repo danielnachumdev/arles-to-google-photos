@@ -1,5 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { postFormData, type UploadProgressEvent } from './xhrFormPost.ts'
+import {
+  parseJobCreateBody,
+  postFormData,
+  type StoreProgressEvent,
+  type UploadProgressEvent,
+} from './xhrFormPost.ts'
 
 type ProgressListener = (event: ProgressEvent) => void
 type VoidListener = () => void
@@ -32,6 +37,8 @@ class FakeXHR {
     this.method = method
     this.url = url
   }
+
+  setRequestHeader(_name: string, _value: string) {}
 
   addEventListener(type: string, listener: VoidListener) {
     const list = this.listeners.get(type) ?? []
@@ -137,5 +144,35 @@ describe('postFormData', () => {
     const pending = postFormData('/api/jobs', new FormData())
     FakeXHR.instances[0]!.failNetwork()
     await expect(pending).rejects.toThrow(/network/i)
+  })
+
+  it('parses NDJSON store progress and resolves the done job', async () => {
+    const store: StoreProgressEvent[] = []
+    const pending = postFormData('/api/jobs', new FormData(), {
+      streamStoreProgress: true,
+      onStoreProgress: (event) => store.push(event),
+    })
+    const xhr = FakeXHR.instances[0]!
+    const body =
+      '{"event":"store","job_id":"j1","current":1,"total":2,"message":"Storing files"}\n' +
+      '{"event":"store","job_id":"j1","current":2,"total":2,"message":"Storing files"}\n' +
+      '{"event":"done","job":{"id":"j1","status":"pending"}}\n'
+    xhr.complete(201, body)
+    await expect(pending).resolves.toEqual({
+      status: 201,
+      bodyText: '{"id":"j1","status":"pending"}',
+    })
+    expect(store).toEqual([
+      { current: 1, total: 2, percent: 50, jobId: 'j1' },
+      { current: 2, total: 2, percent: 100, jobId: 'j1' },
+    ])
+  })
+})
+
+describe('parseJobCreateBody', () => {
+  it('keeps a classic JSON job body', () => {
+    const parsed = parseJobCreateBody('{"id":"job-1","status":"pending"}')
+    expect(parsed.jobJson).toBe('{"id":"job-1","status":"pending"}')
+    expect(parsed.storeEvents).toEqual([])
   })
 })
