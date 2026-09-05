@@ -104,6 +104,9 @@ class _StoreLike(Protocol):
     ) -> Path:
         ...
 
+    def ensure_local_root(self, job_id: str) -> Path:
+        ...
+
     def find_by_title(
         self, title: str, *, owner_id: Optional[str] = None
     ) -> Optional[_JobLike]:
@@ -382,6 +385,38 @@ class IngestService:
         finally:
             shutil.rmtree(staging, ignore_errors=True)
 
+    def finish_prepared(self, job_id: str, *, overwrite: bool = False) -> str:
+        """Parse a job whose album files were already streamed into ArtifactStore."""
+        job = self._store.get(job_id)
+        token_key = job_id
+        try:
+            result_id = self._run_prepared(job, overwrite=overwrite)
+            if self._auto_publisher is not None:
+                self._auto_publisher.after_preview(
+                    result_id, parent_id=result_id, token_key=token_key
+                )
+            return result_id
+        except AlbumExistsError:
+            if self._auto_publisher is not None:
+                self._auto_publisher.discard(token_key)
+            raise
+        except JobCancelled:
+            if self._auto_publisher is not None:
+                self._auto_publisher.discard(token_key)
+            self._mark_cancelled(job_id)
+            return job_id
+        except Exception as exc:
+            if self._auto_publisher is not None:
+                self._auto_publisher.discard(token_key)
+            if store_is_cancelled(self._store, job_id):
+                self._mark_cancelled(job_id)
+                return job_id
+            self._store.set_status(
+                job_id, STATUS_FAILED, error=str(exc), job_type=TYPE_PREVIEW
+            )
+            self._events.emit(job_id, "error", str(exc))
+            raise
+
     def _run(
         self,
         job: _JobLike,
@@ -416,7 +451,32 @@ class IngestService:
         )
         if store_is_cancelled(self._store, job.id):
             raise JobCancelled()
+        return self._parse_and_complete(
+            job, overwrite=overwrite, overwrite_files=overwrite_files
+        )
 
+    def _run_prepared(self, job: _JobLike, *, overwrite: bool = False) -> str:
+        if job.status != STATUS_RUNNING:
+            self._store.set_status(job.id, STATUS_RUNNING, job_type=TYPE_PREVIEW)
+        if store_is_cancelled(self._store, job.id):
+            raise JobCancelled()
+        root = self._store.ensure_local_root(job.id)
+        # Progress: files already durable; signal write complete then parse.
+        self._events.emit(
+            job.id, "ingest", "Upload written", current=1, total=1
+        )
+        if store_is_cancelled(self._store, job.id):
+            raise JobCancelled()
+        del root
+        return self._parse_and_complete(job, overwrite=overwrite, overwrite_files=())
+
+    def _parse_and_complete(
+        self,
+        job: _JobLike,
+        *,
+        overwrite: bool,
+        overwrite_files: Iterable[tuple[str, bytes, Optional[float]]],
+    ) -> str:
         ensure_local_video_previews(job.root)
         preview = self._parser.parse(
             job.root,
