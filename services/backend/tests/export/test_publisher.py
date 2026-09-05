@@ -491,3 +491,26 @@ class TestAlbumPublisher(PublisherSuite):
         assert "0809_2_19_01" in str(caught.value)
         assert "hrimages/0809_2_19_01hr.JPG" in str(caught.value)
 
+    def test_publish_api_reject_includes_item_path(self, tmp_path: Path) -> None:
+        from src.export.publisher import AlbumPublisher
+
+        img = tmp_path / "hrimages" / "0308_1_22hr.wmv"
+        img.parent.mkdir(parents=True, exist_ok=True)
+        img.write_bytes(b"wmv")
+        preview = _preview(_item("0308_1_22", "hrimages/0308_1_22hr.wmv"))
+        gp = MagicMock()
+        album = MagicMock()
+        album.id = "album-x"
+        with patch("src.export.publisher.Album") as AlbumCls, patch(
+            "src.export.publisher.MediaItem"
+        ) as MediaItem:
+            AlbumCls.create.return_value = album
+            MediaItem.upload_media.side_effect = RuntimeError(
+                "400 Client Error: Bad Request for url: "
+                "https://photoslibrary.googleapis.com/v1/uploads"
+            )
+            with pytest.raises(RuntimeError, match="Google Photos rejected upload") as caught:
+                AlbumPublisher().publish(gp, tmp_path, preview)
+        assert "0308_1_22" in str(caught.value)
+        assert "0308_1_22hr.wmv" in str(caught.value)
+

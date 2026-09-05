@@ -109,7 +109,13 @@ class AlbumPublisher:
                     root=root,
                 )
                 done += 1
-                token = MediaItem.upload_media(gp, str(path))
+                try:
+                    token = MediaItem.upload_media(gp, str(path))
+                except Exception as exc:
+                    raise RuntimeError(
+                        f"Google Photos rejected upload of '{item.id}' "
+                        f"({item.relpath}): {exc}"
+                    ) from exc
                 new_items.append(
                     NewMediaItem(item.caption, SimpleMediaItem(token, item.id))
                 )

@@ -249,6 +249,24 @@ class TestPublishService(MockJobServiceSuite):
         assert error_calls[0].args[0] == "upload-1"
         assert "oauth failed" in error_calls[0].args[2]
 
+    def test_publish_http_error_not_framed_as_local_read(self, tmp_path: Path) -> None:
+        from requests import HTTPError, Response
+
+        from src.jobs.publish import _format_publish_failure
+
+        response = Response()
+        response.status_code = 400
+        response.url = "https://photoslibrary.googleapis.com/v1/uploads"
+        exc = HTTPError(
+            "400 Client Error: Bad Request for url: "
+            "https://photoslibrary.googleapis.com/v1/uploads",
+            response=response,
+        )
+        message = _format_publish_failure(exc)
+        assert "Google Photos API error" in message
+        assert "Could not read a photo" not in message
+        assert "photoslibrary.googleapis.com" in message
+
     def test_start_with_parent_emits_child_and_passes_parent_id(self, tmp_path: Path) -> None:
         preview = _preview()
         source = _job(tmp_path, preview)

@@ -248,15 +248,27 @@ class PublishService:
 def _format_publish_failure(exc: BaseException) -> str:
     """Human-readable publish failure for job.error / SSE (not a bare path)."""
     text = str(exc).strip() or type(exc).__name__
+    lowered = text.lower()
+    if lowered.startswith("google photos rejected") or lowered.startswith(
+        "could not load photo"
+    ):
+        return text
     if isinstance(exc, FileNotFoundError):
-        if text.lower().startswith("could not load photo"):
-            return text
         return (
             f"Could not load a photo for Google Photos upload ({text}). "
             "The file is missing from server storage."
         )
+    # requests.HTTPError subclasses OSError — do not call that a local read error.
+    try:
+        from requests import HTTPError, RequestException
+    except ImportError:
+        HTTPError = ()  # type: ignore[misc, assignment]
+        RequestException = ()  # type: ignore[misc, assignment]
+    if isinstance(exc, (HTTPError, RequestException)) or "photoslibrary.googleapis.com" in text:
+        return f"Google Photos API error during upload: {text}"
     if isinstance(exc, OSError) and not isinstance(exc, FileNotFoundError):
-        if text.lower().startswith("could not load photo"):
-            return text
-        return f"Could not read a photo for Google Photos upload: {text}"
+        errno = getattr(exc, "errno", None)
+        # Local filesystem / errno-based failures only.
+        if errno is not None or getattr(exc, "filename", None):
+            return f"Could not read a photo for Google Photos upload: {text}"
     return text
