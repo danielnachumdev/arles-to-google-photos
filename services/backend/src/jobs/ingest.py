@@ -47,6 +47,34 @@ def peek_gallery_title(files: Iterable[FileTuple]) -> Optional[str]:
     return None
 
 
+def peek_gallery_title_from_dir(root: Path) -> Optional[str]:
+    """Best-effort `.gallerytitle` from ``index.html`` on disk (staged upload)."""
+    root = Path(root)
+    candidates = [root / "index.html"]
+    candidates.extend(
+        path
+        for path in root.rglob("index.html")
+        if path != candidates[0]
+    )
+    for index_path in candidates:
+        if not index_path.is_file():
+            continue
+        return peek_gallery_title(
+            [("index.html", index_path.read_bytes(), None)]
+        )
+    return None
+
+
+def iter_files_from_dir(root: Path) -> Iterable[FileTuple]:
+    """Yield ``(relpath, bytes, mtime)`` one file at a time from a staging dir."""
+    root = Path(root)
+    for path in sorted(root.rglob("*")):
+        if not path.is_file():
+            continue
+        rel = path.relative_to(root).as_posix()
+        yield rel, path.read_bytes(), path.stat().st_mtime
+
+
 class AlbumExistsError(Exception):
     """Another job already uses this gallery title; caller must confirm overwrite."""
 
@@ -169,7 +197,7 @@ def _overwrite_album_tree(
                 shutil.rmtree(child)
             else:
                 child.unlink()
-    store.materialize_album(job_id, list(files))
+    store.materialize_album(job_id, files)
 
 
 class _BoundProgressSink:
@@ -255,20 +283,22 @@ class IngestService:
 
     def start(
         self,
-        files: Iterable[tuple[str, bytes, Optional[float]]],
+        files: Iterable[tuple[str, bytes, Optional[float]]] = (),
         *,
         jobs_root: Path,
         overwrite: bool = False,
         auto_publish: bool = False,
         access_token: Optional[str] = None,
         owner_id: Optional[str] = None,
+        title: Optional[str] = None,
     ) -> str:
         if auto_publish:
             token = (access_token or "").strip()
             if not token:
                 raise ValueError("google access token required")
         file_list = list(files)
-        title = peek_gallery_title(file_list)
+        if title is None:
+            title = peek_gallery_title(file_list)
         existing = (
             self._store.find_by_title(title, owner_id=owner_id) if title else None
         )
@@ -327,6 +357,31 @@ class IngestService:
             self._events.emit(job_id, "error", str(exc))
             raise
 
+    def finish_from_directory(
+        self,
+        job_id: str,
+        staging_dir: Path,
+        *,
+        overwrite: bool = False,
+    ) -> str:
+        """Materialize from a disk staging tree (one file in RAM at a time), then parse."""
+        staging = Path(staging_dir)
+        try:
+            paths = [path for path in sorted(staging.rglob("*")) if path.is_file()]
+
+            class _DirFiles:
+                def __len__(self) -> int:
+                    return len(paths)
+
+                def __iter__(self):
+                    for path in paths:
+                        rel = path.relative_to(staging).as_posix()
+                        yield rel, path.read_bytes(), path.stat().st_mtime
+
+            return self.finish(job_id, _DirFiles(), overwrite=overwrite)
+        finally:
+            shutil.rmtree(staging, ignore_errors=True)
+
     def _run(
         self,
         job: _JobLike,
@@ -338,8 +393,20 @@ class IngestService:
             self._store.set_status(job.id, STATUS_RUNNING, job_type=TYPE_PREVIEW)
         if store_is_cancelled(self._store, job.id):
             raise JobCancelled()
-        file_list = list(files)
-        total = len(file_list)
+        # Prefer sized collections so progress totals work; avoid list(generator)
+        # which would load the whole album into RAM.
+        if isinstance(files, (list, tuple)):
+            total = len(files)
+            file_list: Iterable[tuple[str, bytes, Optional[float]]] = files
+            overwrite_files: Iterable[tuple[str, bytes, Optional[float]]] = files
+        elif hasattr(files, "__len__") and hasattr(files, "__iter__"):
+            total = len(files)  # type: ignore[arg-type]
+            file_list = files
+            overwrite_files = files
+        else:
+            total = 0
+            file_list = files
+            overwrite_files = ()
         self._events.emit(
             job.id, "ingest", "Writing upload", current=0, total=total
         )
@@ -370,7 +437,9 @@ class IngestService:
                 raise AlbumExistsError(
                     existing_id=existing.id, title=preview.title
                 )
-            _overwrite_album_tree(existing.id, file_list, self._store)
+            if not overwrite_files:
+                overwrite_files = iter_files_from_dir(job.root)
+            _overwrite_album_tree(existing.id, overwrite_files, self._store)
             # Emit before set_preview so status=done observers always see preview_ready.
             self._events.emit(
                 existing.id,
@@ -400,3 +469,4 @@ class IngestService:
     def _mark_cancelled(self, job_id: str) -> None:
         self._store.set_status(job_id, STATUS_CANCELLED, job_type=TYPE_PREVIEW)
         self._events.emit(job_id, "cancelled", "Job cancelled")
+

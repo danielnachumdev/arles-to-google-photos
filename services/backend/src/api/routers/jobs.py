@@ -1,6 +1,9 @@
 """Job CRUD, media, and reprocess routes."""
 from __future__ import annotations
 
+import os
+import shutil
+import tempfile
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -14,7 +17,7 @@ from ...export.media_kinds import (
     infer_item_kind,
 )
 from ...export.preview import AlbumJournal, PreviewItem
-from ...jobs.ingest import AlbumExistsError
+from ...jobs.ingest import AlbumExistsError, peek_gallery_title_from_dir
 from ...jobs.reprocess import (
     REPROCESS_MODE_NEW,
     job_is_web_origin,
@@ -45,6 +48,22 @@ from ..schemas import PreviewEditBody, ReprocessBody, RestartBody
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
 
+def _safe_staging_dest(staging: Path, relpath: str) -> Path:
+    """Resolve ``relpath`` under ``staging`` or raise on traversal."""
+    normalized = (relpath or "").replace("\\", "/").lstrip("/")
+    if not normalized or Path(normalized).is_absolute():
+        raise HTTPException(status_code=400, detail=f"invalid path: {relpath}")
+    parts = [part for part in normalized.split("/") if part and part != "."]
+    if not parts or any(part == ".." for part in parts):
+        raise HTTPException(status_code=400, detail=f"invalid path: {relpath}")
+    dest = staging.joinpath(*parts).resolve()
+    try:
+        dest.relative_to(staging.resolve())
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=f"invalid path: {relpath}") from exc
+    return dest
+
+
 @router.post("", status_code=201)
 async def create_job(
     files: List[UploadFile] = File(...),
@@ -61,46 +80,61 @@ async def create_job(
     ``{"detail": {"code": "album_exists", "existing_id": "...", "title": "..."}}``.
     ``overwrite=true`` folds into the existing job (keeps id / created_at /
     product_url).
+
+    Files are staged to disk one at a time so large albums do not need the full
+    tree buffered in RAM (Cloud Run OOM at 2Gi).
     """
-    payloads = []
-    mtimes = lastModified or []
-    for index, upload in enumerate(files):
-        relpath = upload.filename or ""
-        data = await upload.read()
-        stamp: Optional[float] = None
-        raw_mtime = mtimes[index] if index < len(mtimes) else None
-        if raw_mtime:
-            stamp = float(raw_mtime) / 1000.0
-        payloads.append((relpath, data, stamp))
     if auto_publish and not (access_token or "").strip():
         raise HTTPException(
             status_code=400, detail="google access token required"
         )
+    staging = Path(
+        tempfile.mkdtemp(prefix="arles-upload-", dir=str(deps.jobs_root))
+    )
+    mtimes = lastModified or []
     try:
-        job_id = deps.ingest.start(
-            payloads,
-            jobs_root=deps.jobs_root,
-            overwrite=overwrite,
-            auto_publish=auto_publish,
-            access_token=access_token,
-            owner_id=user.id,
-        )
-    except AlbumExistsError as exc:
-        raise HTTPException(
-            status_code=409,
-            detail={
-                "code": "album_exists",
-                "existing_id": exc.existing_id,
-                "title": exc.title,
-            },
-        ) from exc
-    except ValueError as exc:
-        raise HTTPException(status_code=400, detail=str(exc)) from exc
+        for index, upload in enumerate(files):
+            relpath = upload.filename or ""
+            dest = _safe_staging_dest(staging, relpath)
+            dest.parent.mkdir(parents=True, exist_ok=True)
+            with dest.open("wb") as out:
+                shutil.copyfileobj(upload.file, out, length=1024 * 1024)
+            raw_mtime = mtimes[index] if index < len(mtimes) else None
+            if raw_mtime:
+                stamp = float(raw_mtime) / 1000.0
+                os.utime(dest, (stamp, stamp))
+        title = peek_gallery_title_from_dir(staging)
+        try:
+            job_id = deps.ingest.start(
+                (),
+                jobs_root=deps.jobs_root,
+                overwrite=overwrite,
+                auto_publish=auto_publish,
+                access_token=access_token,
+                owner_id=user.id,
+                title=title,
+            )
+        except AlbumExistsError as exc:
+            raise HTTPException(
+                status_code=409,
+                detail={
+                    "code": "album_exists",
+                    "existing_id": exc.existing_id,
+                    "title": exc.title,
+                },
+            ) from exc
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from exc
+    except Exception:
+        shutil.rmtree(staging, ignore_errors=True)
+        raise
+
     overwrite_flag = overwrite
+    staging_for_job = staging
     deps.orchestrator.submit(
         job_id,
-        lambda: deps.ingest.finish(
-            job_id, payloads, overwrite=overwrite_flag
+        lambda: deps.ingest.finish_from_directory(
+            job_id, staging_for_job, overwrite=overwrite_flag
         ),
     )
     return deps.store.detail_dict(job_id, owner_id=user.id)

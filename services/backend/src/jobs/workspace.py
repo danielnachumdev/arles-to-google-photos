@@ -3,7 +3,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from pathlib import Path
-from typing import Iterable, List, Optional, Tuple
+from typing import Iterable, Optional
 
 from gp_wrapper.utils import FileTime, FileTimeService
 
@@ -25,13 +25,11 @@ class JobWorkspace:
         ``last_modified`` is set, apply access and modification times via
         ``FileTimeService``.
         """
-        planned: List[Tuple[Path, bytes, Optional[float]]] = [
-            (self._resolve_inside_root(relpath), payload, last_modified)
-            for relpath, payload, last_modified in files
-        ]
+        # Stream one file at a time — do not buffer the whole album in memory.
         self.root.mkdir(parents=True, exist_ok=True)
         times = FileTimeService()
-        for dest, payload, last_modified in planned:
+        for relpath, payload, last_modified in files:
+            dest = self._resolve_inside_root(relpath)
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_bytes(payload)
             if last_modified is not None:

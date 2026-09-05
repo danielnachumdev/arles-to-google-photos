@@ -121,13 +121,15 @@ class GcsArtifactStore(ArtifactStore):
         *,
         owner_id: Optional[str] = None,
     ) -> Path:
-        items = [(validate_relpath(rel), data, ts) for rel, data, ts in files]
+        # One file at a time so large albums do not need 2× album RAM.
         root = self._cache_root(job_id)
-        JobWorkspace(root).materialize(items)
-        for rel, data, _ts in items:
-            if Path(rel).name in STATE_FILE_NAMES:
+        workspace = JobWorkspace(root)
+        for rel, data, ts in files:
+            safe_rel = validate_relpath(rel)
+            workspace.materialize([(safe_rel, data, ts)])
+            if Path(safe_rel).name in STATE_FILE_NAMES:
                 continue
-            self._blob(job_id, rel, owner_id=owner_id).upload_from_string(data)
+            self._blob(job_id, safe_rel, owner_id=owner_id).upload_from_string(data)
         return root
 
     def delete_job(self, job_id: str, *, owner_id: Optional[str] = None) -> None:
