@@ -432,34 +432,49 @@ def classify_scrape_error(
     *,
     url: str = "",
 ) -> tuple[Optional[str], str]:
-    """Map scraper exceptions to a stable error_code and readable message."""
+    """Map scraper exceptions to a stable error_code and readable message.
+
+    Keeps a stable prefix for the UI while appending the original exception
+    text when it adds diagnostic detail (HTTP reason, tried URLs, etc.).
+    """
     target = str(getattr(exc, "url", "") or url or "").strip()
+    original = str(exc).strip()
+
+    def _with_detail(base: str) -> str:
+        if not original or original == base:
+            return base
+        if original in base or base in original:
+            # Prefer the longer / more specific string.
+            return original if len(original) >= len(base) else base
+        return f"{base} — {original}"
+
     if isinstance(exc, NotArlesGalleryError) or getattr(
         exc, "error_code", None
     ) == ERROR_NOT_ARLES:
-        message = f"Not a supported Arles album: {target}".rstrip(": ")
-        return ERROR_NOT_ARLES, message
+        base = f"Not a supported Arles album: {target}".rstrip(": ")
+        return ERROR_NOT_ARLES, _with_detail(base)
     if isinstance(exc, ScrapeFetchError) or getattr(
         exc, "error_code", None
     ) == ERROR_FETCH_FAILED:
         status = getattr(exc, "status_code", None)
         if isinstance(status, int):
-            suffix = f" (HTTP {status})"
             where = f": {target}" if target else ""
-            return ERROR_FETCH_FAILED, f"Failed to download gallery{where}{suffix}"
+            base = f"Failed to download gallery{where} (HTTP {status})"
+            return ERROR_FETCH_FAILED, _with_detail(base)
         if target:
-            return ERROR_FETCH_FAILED, f"Failed to download gallery: {target}"
-        text = str(exc).strip() or "Failed to download gallery"
-        return ERROR_FETCH_FAILED, text
+            return ERROR_FETCH_FAILED, _with_detail(
+                f"Failed to download gallery: {target}"
+            )
+        return ERROR_FETCH_FAILED, original or "Failed to download gallery"
     if isinstance(exc, ScrapeEmptyError) or getattr(
         exc, "error_code", None
     ) == ERROR_SCRAPE_EMPTY:
-        message = f"No album photos found: {target}".rstrip(": ")
-        return ERROR_SCRAPE_EMPTY, message
-    if str(exc).strip() == "scrape returned no files":
-        message = f"No album photos found: {target}".rstrip(": ")
-        return ERROR_SCRAPE_EMPTY, message
-    return None, str(exc)
+        base = f"No album photos found: {target}".rstrip(": ")
+        return ERROR_SCRAPE_EMPTY, _with_detail(base)
+    if original == "scrape returned no files":
+        base = f"No album photos found: {target}".rstrip(": ")
+        return ERROR_SCRAPE_EMPTY, _with_detail(base)
+    return None, original
 
 
 def _skip_done_urls(job: Job) -> Set[str]:

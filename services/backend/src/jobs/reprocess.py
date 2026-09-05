@@ -268,22 +268,25 @@ class ReprocessService:
                 total=0,
             )
             album_root = self._store.ensure_local_root(job.id)
-            hydrate_video_sources(
+            hydrate_notes = hydrate_video_sources(
                 album_root,
                 lambda rel: self._store.ensure_artifact_file(job.id, rel),
             )
-            created = ensure_local_video_previews(album_root) or ()
-            persist_video_preview_sidecars(
-                self._store, job.id, album_root, created
-            )
-            loose = not job_is_web_origin(job)
-            preview = self._parser.parse(
-                album_root,
-                sink=cancellable_sink(
-                    self._events.sink_for(job.id), self._store, job.id
-                ),
-                allow_loose_media=loose,
-            )
+            try:
+                created = ensure_local_video_previews(album_root) or ()
+                persist_video_preview_sidecars(
+                    self._store, job.id, album_root, created
+                )
+                loose = not job_is_web_origin(job)
+                preview = self._parser.parse(
+                    album_root,
+                    sink=cancellable_sink(
+                        self._events.sink_for(job.id), self._store, job.id
+                    ),
+                    allow_loose_media=loose,
+                )
+            except Exception as exc:
+                raise RuntimeError(f"reprocess failed at parse: {exc}") from exc
             if store_is_cancelled(self._store, job.id):
                 raise JobCancelled()
             if title_prefix is not None:
@@ -293,6 +296,7 @@ class ReprocessService:
             warnings = (
                 [STRUCTURE_FALLBACK_WARNING] if preview.structure_fallback else []
             )
+            warnings.extend(hydrate_notes)
             # Emit before set_preview so status=done observers always see preview_ready.
             self._events.emit(
                 job.id,

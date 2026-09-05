@@ -297,8 +297,10 @@ class ArlesGalleryScraper:
         try:
             resource = self._client.get(url, headers)
         except FetchError as exc:
+            reason = str(exc).strip()
+            suffix = f" — {reason}" if reason else ""
             raise ScrapeFetchError(
-                f"Failed to fetch {what}: {url}",
+                f"Failed to fetch {what}: {url}{suffix}",
                 url=url,
             ) from exc
         if resource.status_code != 200:

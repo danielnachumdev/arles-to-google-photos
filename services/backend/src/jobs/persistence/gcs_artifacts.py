@@ -225,10 +225,24 @@ class GcsArtifactStore(ArtifactStore):
                 return dest
             raise FileNotFoundError(safe_rel)
         blob = self._blob(job_id, safe_rel, owner_id=owner_id)
-        if not blob.exists():
-            raise FileNotFoundError(safe_rel)
+        try:
+            exists = blob.exists()
+        except Exception as exc:
+            raise OSError(
+                f"GCS ensure_file failed job={job_id} rel='{safe_rel}': "
+                f"could not stat object: {exc}"
+            ) from exc
+        if not exists:
+            raise FileNotFoundError(
+                f"GCS object missing for job={job_id} rel='{safe_rel}'"
+            )
         dest.parent.mkdir(parents=True, exist_ok=True)
-        blob.download_to_filename(str(dest))
+        try:
+            blob.download_to_filename(str(dest))
+        except Exception as exc:
+            raise OSError(
+                f"GCS download failed job={job_id} rel='{safe_rel}': {exc}"
+            ) from exc
         mtime = self._blob_mtime(blob)
         if mtime is not None:
             os.utime(dest, (mtime, mtime))

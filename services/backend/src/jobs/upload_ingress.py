@@ -23,6 +23,7 @@ from typing import (
 )
 
 from .ingest import peek_gallery_title
+from .store import STATUS_FAILED, TYPE_PREVIEW
 
 STORE_MESSAGE = "Storing files"
 
@@ -62,6 +63,17 @@ class _StoreLike(Protocol):
         path: Path,
         mtime: Optional[float] = None,
     ) -> None:
+        ...
+
+    def set_status(
+        self,
+        job_id: str,
+        status: str,
+        error: Optional[str] = None,
+        *,
+        job_type: Optional[str] = None,
+        error_code: Optional[str] = None,
+    ) -> Any:
         ...
 
 
@@ -155,8 +167,10 @@ class MultipartAlbumIngress:
             title=title,
         )
         total = len(parts)
+        current_rel = ""
         try:
             for index, part in enumerate(parts, start=1):
+                current_rel = str(part.relpath)
                 self._accept_part(job_id, part)
                 self._emit_store_progress(job_id, index, total)
                 yield {
@@ -166,10 +180,24 @@ class MultipartAlbumIngress:
                     "total": total,
                     "message": STORE_MESSAGE,
                 }
-        except Exception:
-            # Best-effort: caller / start already created the job; leave cleanup
-            # to normal failed-job paths. Do not keep partial staging dirs.
-            raise
+        except Exception as exc:
+            where = f" at '{current_rel}'" if current_rel else ""
+            message = f"upload store failed{where}: {exc}"
+            try:
+                self._store.set_status(
+                    job_id,
+                    STATUS_FAILED,
+                    error=message,
+                    job_type=TYPE_PREVIEW,
+                )
+            except Exception:
+                pass
+            if self._emit is not None:
+                try:
+                    self._emit(job_id, "error", message)
+                except Exception:
+                    pass
+            raise RuntimeError(message) from exc
 
         overwrite_flag = overwrite
         self._submit(

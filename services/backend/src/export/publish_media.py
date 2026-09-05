@@ -3,14 +3,15 @@ from __future__ import annotations
 
 import shutil
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Tuple
 
 from .media_kinds import KIND_VIDEO, infer_item_kind, is_video_filename
 from .preview import PreviewItem
-from .video_preview import transcode_to_mp4
+from .video_preview import try_transcode_to_mp4
 
 PathResolver = Callable[[str], Path]
-TranscodeFn = Callable[[Path, Path], bool]
+# Returns (ok, failure_detail). detail empty on success.
+TranscodeFn = Callable[[Path, Path], Tuple[bool, str]]
 
 
 class PublishMediaPreparer:
@@ -23,7 +24,7 @@ class PublishMediaPreparer:
     """
 
     def __init__(self, *, transcode: Optional[TranscodeFn] = None) -> None:
-        self._transcode = transcode or transcode_to_mp4
+        self._transcode = transcode or try_transcode_to_mp4
 
     def prepare(
         self,
@@ -33,7 +34,15 @@ class PublishMediaPreparer:
         resolve: PathResolver,
     ) -> Path:
         del root  # resolve owns durable hydrate; root is for call-site clarity
-        source = resolve(item.relpath)
+        try:
+            source = resolve(item.relpath)
+        except FileNotFoundError:
+            raise
+        except OSError as exc:
+            raise OSError(
+                f"Could not load photo '{item.id}' for Google Photos upload "
+                f"({item.relpath}): {exc}"
+            ) from exc
         if not source.is_file() or source.stat().st_size <= 0:
             raise FileNotFoundError(
                 f"Could not load photo '{item.id}' for Google Photos upload "
@@ -63,8 +72,16 @@ class PublishMediaPreparer:
             return companion
 
         play = (item.play_relpath or "").strip()
+        play_note = f"play_relpath={play}" if play else "play_relpath=none"
         if play:
-            play_path = resolve(play)
+            try:
+                play_path = resolve(play)
+            except Exception as exc:
+                raise RuntimeError(
+                    f"Could not prepare MP4 for Google Photos upload of "
+                    f"'{item.id}' ({item.relpath}): failed to hydrate "
+                    f"preview '{play}': {exc}"
+                ) from exc
             if play_path.is_file() and play_path.stat().st_size > 0:
                 try:
                     shutil.copy2(play_path, companion)
@@ -77,14 +94,15 @@ class PublishMediaPreparer:
                 if companion.is_file() and companion.stat().st_size > 0:
                     return companion
 
-        if self._transcode(source, companion):
-            if companion.is_file() and companion.stat().st_size > 0:
-                return companion
+        ok, detail = self._transcode(source, companion)
+        if ok and companion.is_file() and companion.stat().st_size > 0:
+            return companion
 
+        why = detail.strip() or "transcode returned no output"
         raise RuntimeError(
             f"Could not prepare an MP4 for Google Photos upload of '{item.id}' "
-            f"({item.relpath}). Convert the video locally or reprocess so a "
-            f"preview MP4 exists, then retry publish."
+            f"({item.relpath}; {play_note}): {why}. "
+            f"Reprocess the album so a preview MP4 exists, then retry publish."
         )
 
     @staticmethod

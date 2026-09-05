@@ -116,10 +116,10 @@ class TestPublishMediaPreparer:
         wmv.write_bytes(b"wmv-bytes")
         calls: List[tuple[Path, Path]] = []
 
-        def fake_transcode(src: Path, dest: Path) -> bool:
+        def fake_transcode(src: Path, dest: Path) -> tuple[bool, str]:
             calls.append((src, dest))
             dest.write_bytes(b"ftyp-xcode")
-            return True
+            return True, ""
 
         path = PublishMediaPreparer(transcode=fake_transcode).prepare(
             _video(play=None),
@@ -137,11 +137,12 @@ class TestPublishMediaPreparer:
         wmv.write_bytes(b"wmv-bytes")
 
         with pytest.raises(RuntimeError, match="clip01") as caught:
-            PublishMediaPreparer(transcode=lambda *_a: False).prepare(
+            PublishMediaPreparer(transcode=lambda *_a: (False, "ffmpeg exit 1: boom")).prepare(
                 _video(play=None),
                 root=tmp_path,
                 resolve=lambda rel: tmp_path / rel,
             )
         message = str(caught.value)
         assert "hrimages/clip01hr.wmv" in message
+        assert "ffmpeg exit 1: boom" in message
         assert "mp4" in message.lower()

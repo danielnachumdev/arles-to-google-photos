@@ -189,7 +189,7 @@ class TestIngestService(MockJobServiceSuite):
         events = MagicMock()
         workspace = MagicMock()
 
-        with pytest.raises(ValueError, match="index.html"):
+        with pytest.raises(RuntimeError, match="ingest failed at parse"):
             _service(store, parser, events, workspace).ingest(
                 _files(), jobs_root=tmp_path / "jobs"
             )
@@ -207,6 +207,7 @@ class TestIngestService(MockJobServiceSuite):
             error = status_args[2]
         assert error is not None
         assert "index.html" in str(error)
+        assert "ingest failed at parse" in str(error)
 
         stages = _emit_stages(events)
         assert "error" in stages

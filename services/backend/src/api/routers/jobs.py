@@ -418,6 +418,11 @@ def get_media(
                 )
             except FileNotFoundError as exc:
                 raise HTTPException(status_code=404, detail="media missing") from exc
+            except OSError as exc:
+                raise HTTPException(
+                    status_code=422,
+                    detail=str(exc).strip() or "thumbnail render failed",
+                ) from exc
             if not path.is_file():
                 raise HTTPException(status_code=404, detail="media missing")
             return FileResponse(path, media_type="image/jpeg")
@@ -428,6 +433,11 @@ def get_media(
             path = deps.store.ensure_artifact_file(job_id, relpath)
         except FileNotFoundError as exc:
             raise HTTPException(status_code=404, detail="media missing") from exc
+        except OSError as exc:
+            raise HTTPException(
+                status_code=502,
+                detail=str(exc).strip() or "media storage error",
+            ) from exc
         if not path.is_file():
             raise HTTPException(status_code=404, detail="media missing")
         return FileResponse(path)

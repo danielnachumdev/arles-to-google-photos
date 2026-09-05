@@ -579,4 +579,27 @@ class TestAlbumPublisher(PublisherSuite):
         assert uploaded.name == "clip01hr.mp4"
         assert uploaded.read_bytes() == durable
 
+    def test_publish_batch_create_failure_names_step_and_items(
+        self, tmp_path: Path
+    ) -> None:
+        from src.export.publisher import AlbumPublisher
+
+        img = tmp_path / "hrimages" / "a.jpg"
+        img.parent.mkdir(parents=True)
+        img.write_bytes(b"jpeg")
+        preview = _preview(_item("a", "hrimages/a.jpg", "cap"))
+        gp = MagicMock()
+        album = MagicMock()
+        album.id = "album-batch"
+        with patch("src.export.publisher.Album") as AlbumCls, patch(
+            "src.export.publisher.MediaItem"
+        ) as MediaItem:
+            AlbumCls.create.return_value = album
+            MediaItem.upload_media.return_value = "tok"
+            MediaItem.batchCreate.side_effect = RuntimeError("quota exceeded")
+            with pytest.raises(RuntimeError, match="batchCreate") as caught:
+                AlbumPublisher().publish(gp, tmp_path, preview)
+        assert "quota exceeded" in str(caught.value)
+        assert "'a'" in str(caught.value)
+
 

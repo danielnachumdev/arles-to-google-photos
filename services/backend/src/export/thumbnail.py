@@ -136,7 +136,9 @@ class ThumbnailRenderer:
                 quality=self._policy.jpeg_quality,
             )
         except OSError as exc:
-            raise FileNotFoundError(original_relpath) from exc
+            raise OSError(
+                f"thumbnail render failed for '{item_id}' ({original_relpath}): {exc}"
+            ) from exc
         try:
             self._store.put_album_file(job_id, derived_rel, derived_local)
         except Exception:

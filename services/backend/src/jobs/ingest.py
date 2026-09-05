@@ -542,25 +542,34 @@ class IngestService:
         overwrite: bool,
         overwrite_files: Iterable[tuple[str, bytes, Optional[float]]],
     ) -> str:
-        hydrate_video_sources(
+        hydrate_notes = hydrate_video_sources(
             job.root,
             lambda rel: self._store.ensure_artifact_file(job.id, rel),
         )
-        created = ensure_local_video_previews(job.root) or ()
-        persist_video_preview_sidecars(self._store, job.id, job.root, created)
-        preview = self._parser.parse(
-            job.root,
-            sink=cancellable_sink(
-                _BoundProgressSink(self._events, job.id), self._store, job.id
-            ),
-            allow_loose_media=True,
-        )
+        try:
+            created = ensure_local_video_previews(job.root) or ()
+            persist_video_preview_sidecars(self._store, job.id, job.root, created)
+        except Exception as exc:
+            raise RuntimeError(
+                f"ingest failed at video_preview: {exc}"
+            ) from exc
+        try:
+            preview = self._parser.parse(
+                job.root,
+                sink=cancellable_sink(
+                    _BoundProgressSink(self._events, job.id), self._store, job.id
+                ),
+                allow_loose_media=True,
+            )
+        except Exception as exc:
+            raise RuntimeError(f"ingest failed at parse: {exc}") from exc
         if store_is_cancelled(self._store, job.id):
             raise JobCancelled()
         existing = self._store.find_by_title(
             preview.title, owner_id=getattr(job, "owner_id", None)
         )
-        warnings = _preview_warnings(preview)
+        warnings = list(_preview_warnings(preview))
+        warnings.extend(hydrate_notes)
         if existing is not None and existing.id != job.id:
             if not overwrite:
                 self._store.delete(job.id)

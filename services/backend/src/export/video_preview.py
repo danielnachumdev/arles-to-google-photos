@@ -4,7 +4,7 @@ from __future__ import annotations
 import subprocess
 import tempfile
 from pathlib import Path
-from typing import Callable, Optional, Protocol, Sequence, Tuple
+from typing import Callable, List, Optional, Protocol, Sequence, Tuple
 
 from .media_kinds import (
     BROWSER_PLAYABLE_VIDEO,
@@ -45,9 +45,30 @@ def _ffmpeg_exe() -> Optional[str]:
 
 def transcode_to_mp4(source: Path, dest: Path) -> bool:
     """Write ``dest`` as mp4. Returns False on failure (never raises)."""
-    if _transcode_with_ffmpeg(source, dest):
-        return True
-    return _transcode_with_moviepy(source, dest)
+    ok, _reason = try_transcode_to_mp4(source, dest)
+    return ok
+
+
+def try_transcode_to_mp4(source: Path, dest: Path) -> Tuple[bool, str]:
+    """Like :func:`transcode_to_mp4` but returns ``(ok, failure_detail)``.
+
+    ``failure_detail`` is empty on success; otherwise a short encoder/stderr note
+    for publish/job error messages.
+    """
+    ok, reason = _transcode_with_ffmpeg(source, dest)
+    if ok:
+        return True, ""
+    reasons: List[str] = []
+    if reason:
+        reasons.append(reason)
+    ok, reason = _transcode_with_moviepy(source, dest)
+    if ok:
+        return True, ""
+    if reason:
+        reasons.append(reason)
+    if not reasons:
+        reasons.append("no encoder available (ffmpeg/moviepy)")
+    return False, "; ".join(reasons)
 
 
 def extract_poster_frame(source: Path, dest: Path) -> bool:
@@ -57,13 +78,22 @@ def extract_poster_frame(source: Path, dest: Path) -> bool:
     return _extract_frame_with_moviepy(source, dest)
 
 
-def _transcode_with_ffmpeg(source: Path, dest: Path) -> bool:
+def _stderr_tail(data: bytes, *, limit: int = 240) -> str:
+    text = (data or b"").decode("utf-8", errors="replace").strip()
+    text = " ".join(text.split())
+    if len(text) <= limit:
+        return text
+    return text[-limit:]
+
+
+def _transcode_with_ffmpeg(source: Path, dest: Path) -> Tuple[bool, str]:
     ffmpeg = _ffmpeg_exe()
     if not ffmpeg:
-        return False
+        return False, "ffmpeg not found"
     dest = Path(dest)
     dest.parent.mkdir(parents=True, exist_ok=True)
     tmp_path: Optional[Path] = None
+    last_detail = "ffmpeg produced no output"
     try:
         with tempfile.NamedTemporaryFile(
             prefix=f".{dest.stem}_xcode_",
@@ -73,33 +103,39 @@ def _transcode_with_ffmpeg(source: Path, dest: Path) -> bool:
         ) as handle:
             tmp_path = Path(handle.name)
         # Remux first (MOV→MP4); re-encode for WMV / incompatible codecs.
-        for args in (
-            [
-                ffmpeg,
-                "-y",
-                "-i",
-                str(source),
-                "-c",
-                "copy",
-                "-movflags",
-                "+faststart",
-                str(tmp_path),
-            ],
-            [
-                ffmpeg,
-                "-y",
-                "-i",
-                str(source),
-                "-c:v",
+        for label, args in (
+            (
+                "remux",
+                [
+                    ffmpeg,
+                    "-y",
+                    "-i",
+                    str(source),
+                    "-c",
+                    "copy",
+                    "-movflags",
+                    "+faststart",
+                    str(tmp_path),
+                ],
+            ),
+            (
                 "libx264",
-                "-pix_fmt",
-                "yuv420p",
-                "-c:a",
-                "aac",
-                "-movflags",
-                "+faststart",
-                str(tmp_path),
-            ],
+                [
+                    ffmpeg,
+                    "-y",
+                    "-i",
+                    str(source),
+                    "-c:v",
+                    "libx264",
+                    "-pix_fmt",
+                    "yuv420p",
+                    "-c:a",
+                    "aac",
+                    "-movflags",
+                    "+faststart",
+                    str(tmp_path),
+                ],
+            ),
         ):
             result = subprocess.run(args, check=False, capture_output=True)
             if (
@@ -108,14 +144,18 @@ def _transcode_with_ffmpeg(source: Path, dest: Path) -> bool:
                 and tmp_path.stat().st_size > 0
             ):
                 tmp_path.replace(dest)
-                return True
+                return True, ""
+            tail = _stderr_tail(result.stderr)
+            last_detail = f"ffmpeg {label} exit {result.returncode}"
+            if tail:
+                last_detail = f"{last_detail}: {tail}"
         if tmp_path is not None:
             tmp_path.unlink(missing_ok=True)
-        return False
-    except Exception:
+        return False, last_detail
+    except Exception as exc:
         if tmp_path is not None:
             tmp_path.unlink(missing_ok=True)
-        return False
+        return False, f"ffmpeg error: {exc}"
 
 
 def _extract_frame_with_ffmpeg(source: Path, dest: Path) -> bool:
@@ -145,11 +185,11 @@ def _extract_frame_with_ffmpeg(source: Path, dest: Path) -> bool:
         return False
 
 
-def _transcode_with_moviepy(source: Path, dest: Path) -> bool:
+def _transcode_with_moviepy(source: Path, dest: Path) -> Tuple[bool, str]:
     try:
         import moviepy.editor as moviepy  # type: ignore[import-untyped]
-    except Exception:
-        return False
+    except Exception as exc:
+        return False, f"moviepy unavailable: {exc}"
     try:
         dest = Path(dest)
         dest.parent.mkdir(parents=True, exist_ok=True)
@@ -160,9 +200,11 @@ def _transcode_with_moviepy(source: Path, dest: Path) -> bool:
             close = getattr(clip, "close", None)
             if callable(close):
                 close()
-        return dest.is_file() and dest.stat().st_size > 0
-    except Exception:
-        return False
+        if dest.is_file() and dest.stat().st_size > 0:
+            return True, ""
+        return False, "moviepy wrote empty output"
+    except Exception as exc:
+        return False, f"moviepy: {exc}"
 
 
 def _extract_frame_with_moviepy(source: Path, dest: Path) -> bool:
@@ -200,22 +242,24 @@ def iter_video_source_relpaths(root: Path) -> Tuple[str, ...]:
     return tuple(found)
 
 
-def hydrate_video_sources(root: Path, ensure_file: EnsureFileFn) -> None:
+def hydrate_video_sources(root: Path, ensure_file: EnsureFileFn) -> Tuple[str, ...]:
     """Download real video bytes for sparse/GCS placeholders before transcode.
 
     Cloud Run keeps empty media placeholders until ``ensure_file``; moviepy/ffmpeg
     cannot build ``preview/*.mp4`` from zero-byte WMV stubs. Also re-hydrates
     existing ``preview/*.mp4`` sidecars so reprocess does not re-encode needlessly.
+
+    Returns short failure notes (empty on full success) for job warnings.
     """
+    failures: List[str] = []
     for rel in iter_video_source_relpaths(root):
         try:
             ensure_file(rel)
-        except Exception:
-            # Missing object or network blip — skip; ensure_local will ignore empty.
-            pass
+        except Exception as exc:
+            failures.append(f"video hydrate failed '{rel}': {exc}")
     preview_dir = Path(root) / "preview"
     if not preview_dir.is_dir():
-        return
+        return tuple(failures)
     for path in preview_dir.iterdir():
         if not path.is_file():
             continue
@@ -223,10 +267,12 @@ def hydrate_video_sources(root: Path, ensure_file: EnsureFileFn) -> None:
             continue
         if path.stat().st_size > 0:
             continue
+        rel = path.relative_to(root).as_posix()
         try:
-            ensure_file(path.relative_to(root).as_posix())
-        except Exception:
-            pass
+            ensure_file(rel)
+        except Exception as exc:
+            failures.append(f"video hydrate failed '{rel}': {exc}")
+    return tuple(failures)
 
 
 def ensure_local_video_previews(
@@ -318,4 +364,5 @@ __all__ = [
     "iter_video_source_relpaths",
     "persist_video_preview_sidecars",
     "transcode_to_mp4",
+    "try_transcode_to_mp4",
 ]

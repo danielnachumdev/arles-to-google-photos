@@ -79,20 +79,29 @@ class AlbumPublisher:
 
         album = _create_album(gp, preview.title)
         if preview.description:
-            album.add_text([preview.description])
+            _photos_step(
+                "add_text (gallery description)",
+                lambda: album.add_text([preview.description]),
+            )
         # FIRST_IN_ALBUM inserts at the start, so later calls sit higher:
         # heading (top) → body → gallery description → photos.
         body_parts = _journal_body_parts(preview.journal)
         if body_parts is not None:
-            album.add_text(
-                body_parts,
-                relative_position=PositionType.FIRST_IN_ALBUM,
+            _photos_step(
+                "add_text (journal body)",
+                lambda: album.add_text(
+                    body_parts,
+                    relative_position=PositionType.FIRST_IN_ALBUM,
+                ),
             )
         heading_parts = _journal_heading_parts(preview.journal)
         if heading_parts is not None:
-            album.add_text(
-                heading_parts,
-                relative_position=PositionType.FIRST_IN_ALBUM,
+            _photos_step(
+                "add_text (journal heading)",
+                lambda: album.add_text(
+                    heading_parts,
+                    relative_position=PositionType.FIRST_IN_ALBUM,
+                ),
             )
 
         # Prefer taken_on from preview ids; do not resolve media just to sniff EXIF.
@@ -147,7 +156,10 @@ class AlbumPublisher:
                     PositionType.AFTER_MEDIA_ITEM,
                     relativeMediaItemId=last_id,
                 )
-            results = MediaItem.batchCreate(gp, new_items, album.id, position)
+            results = _photos_step(
+                _batch_create_label(new_items),
+                lambda: MediaItem.batchCreate(gp, new_items, album.id, position),
+            )
             last_id = _last_created_media_id(results) or last_id
         return album
 
@@ -190,6 +202,31 @@ def _format_upload_reject(item: PreviewItem, upload_path: Path, exc: BaseExcepti
         where = source
     detail = str(exc).strip() or exc.__class__.__name__
     return f"Google Photos rejected upload of '{item.id}' ({where}): {detail}"
+
+
+def _photos_step(label: str, action: Callable[[], object]) -> object:
+    """Run a Photos API call; wrap failures with the step name for job.error."""
+    try:
+        return action()
+    except Exception as exc:
+        detail = str(exc).strip() or exc.__class__.__name__
+        raise RuntimeError(f"Google Photos {label} failed: {detail}") from exc
+
+
+def _batch_create_label(new_items: Sequence[NewMediaItem]) -> str:
+    ids: List[str] = []
+    for entry in new_items:
+        simple = getattr(entry, "simpleMediaItem", None) or getattr(
+            entry, "simple_media_item", None
+        )
+        file_name = getattr(simple, "fileName", None) or getattr(simple, "file_name", None)
+        if file_name:
+            ids.append(str(file_name))
+    if not ids:
+        return f"batchCreate ({len(new_items)} items)"
+    if len(ids) == 1:
+        return f"batchCreate ('{ids[0]}')"
+    return f"batchCreate ('{ids[0]}'…'{ids[-1]}', {len(ids)} items)"
 
 
 
