@@ -192,7 +192,8 @@ class TestJobsApi(ApiClientSuite):
         assert got.json()["id"] == job_id
         assert got.json()["number"] == 1
 
-    def test_post_job_ndjson_streams_store_progress(self, tmp_path: Path) -> None:
+    def test_post_job_ndjson_returns_done_after_staging(self, tmp_path: Path) -> None:
+        """NDJSON Accept still works; durable store is background (no inline store lines)."""
         client = _client(tmp_path)
         created = client.post(
             "/api/jobs",
@@ -202,13 +203,9 @@ class TestJobsApi(ApiClientSuite):
         assert created.status_code == 201, created.text
         assert "application/x-ndjson" in (created.headers.get("content-type") or "")
         lines = [ln for ln in created.text.strip().splitlines() if ln.strip()]
-        assert len(lines) >= 2
         events = [json.loads(ln) for ln in lines]
-        store_events = [e for e in events if e.get("event") == "store"]
+        assert not any(e.get("event") == "store" for e in events)
         done = next(e for e in events if e.get("event") == "done")
-        assert store_events
-        assert store_events[0]["current"] == 1
-        assert store_events[-1]["current"] == store_events[-1]["total"]
         assert done["job"]["id"]
         body = _wait_job(client, done["job"]["id"])
         assert body["status"] == "done"

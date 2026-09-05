@@ -103,6 +103,21 @@ class TestGcsArtifactStore(ArtifactStoreSuite):
         assert again.read_bytes() == self.JPEG_BYTES
         assert self.gcs.download_to_filename_calls == before
 
+    def test_stage_file_keeps_full_local_bytes_without_gcs_upload(self) -> None:
+        source = self.tmp_path / "src.jpg"
+        source.write_bytes(self.JPEG_BYTES)
+        before = list(self.gcs.bucket("test-bucket").list_blobs(prefix="jobs/job-1/"))
+        self.artifacts.stage_file("job-1", "hrimages/a.jpg", source)
+        dest = self.tmp_path / "job-1" / "hrimages" / "a.jpg"
+        assert dest.is_file()
+        assert dest.read_bytes() == self.JPEG_BYTES
+        after = list(self.gcs.bucket("test-bucket").list_blobs(prefix="jobs/job-1/"))
+        assert len(after) == len(before)
+        # Later durable put uploads and placeholders.
+        self.artifacts.put_file("job-1", "hrimages/a.jpg", dest)
+        assert self.artifacts.exists("job-1", "hrimages/a.jpg")
+        assert dest.stat().st_size == 0
+
     def test_local_root_hydrate_false_skips_download(self) -> None:
         self.artifacts.materialize(
             "job-1",

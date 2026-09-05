@@ -784,6 +784,13 @@ class JobStore:
         Hub fan-out children with ``extra.album_relpath`` get that subdirectory
         as ``job.root`` while artifacts stay on ``source_job_id``.
         """
+        return self._album_root(job_id, hydrate=True)
+
+    def staged_album_root(self, job_id: str) -> Path:
+        """Local album tree without remote hydrate (keeps staged full media)."""
+        return self._album_root(job_id, hydrate=False)
+
+    def _album_root(self, job_id: str, *, hydrate: bool) -> Path:
         from .folder_hub import album_relpath_of
 
         with self._lock:
@@ -792,7 +799,7 @@ class JobStore:
             owner_id = job.owner_id
             album_rel = album_relpath_of(job)
         root = self._require_artifacts().local_root(
-            artifact_id, owner_id=owner_id, hydrate=True
+            artifact_id, owner_id=owner_id, hydrate=hydrate
         )
         if album_rel:
             root = root / album_rel
@@ -835,6 +842,51 @@ class JobStore:
             mtime,
             owner_id=owner_id,
         )
+
+    def stage_album_file(
+        self,
+        job_id: str,
+        relpath: str,
+        path: Path,
+        mtime: Optional[float] = None,
+    ) -> None:
+        """Keep one album file on the local job tree without remote upload."""
+        from .folder_hub import artifact_relpath_for
+
+        with self._lock:
+            job = self._require(job_id)
+            artifact_id = job.source_job_id or job.id
+            owner_id = job.owner_id
+            stored_rel = artifact_relpath_for(job, relpath)
+        self._require_artifacts().stage_file(
+            artifact_id,
+            stored_rel,
+            Path(path),
+            mtime,
+            owner_id=owner_id,
+        )
+
+    def list_album_relpaths(self, job_id: str) -> List[str]:
+        """Relative album artifact paths for a job (excludes state json)."""
+        from .folder_hub import album_relpath_of
+
+        with self._lock:
+            job = self._require(job_id)
+            artifact_id = job.source_job_id or job.id
+            owner_id = job.owner_id
+            album_rel = album_relpath_of(job)
+        rels = self._require_artifacts().list(artifact_id, owner_id=owner_id)
+        if not album_rel:
+            return rels
+        prefix = album_rel.replace("\\", "/").strip("/") + "/"
+        trimmed: List[str] = []
+        for rel in rels:
+            text = rel.replace("\\", "/")
+            if text.startswith(prefix):
+                trimmed.append(text[len(prefix) :])
+            elif text == album_rel.replace("\\", "/").strip("/"):
+                continue
+        return trimmed
 
     def retains_full_local_tree(self) -> bool:
         return self._require_artifacts().retains_full_local_tree

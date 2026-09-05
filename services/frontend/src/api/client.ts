@@ -116,8 +116,7 @@ export class MigrationClient {
     const query = params.toString() ? `?${params.toString()}` : ''
     const { status, bodyText } = await postFormData(`${this.baseUrl}/jobs${query}`, form, {
       onProgress: options?.onUploadProgress,
-      onStoreProgress: options?.onStoreProgress,
-      streamStoreProgress: true,
+      // Durable store runs in a background job; do not block the XHR on NDJSON store lines.
     })
 
     if (status === 409) {

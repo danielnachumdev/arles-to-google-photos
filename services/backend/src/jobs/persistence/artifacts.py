@@ -72,6 +72,29 @@ class ArtifactStore(ABC):
             owner_id=owner_id,
         )
 
+    def stage_file(
+        self,
+        job_id: str,
+        relpath: str,
+        path: Path,
+        last_modified_ts: Optional[float] = None,
+        *,
+        owner_id: Optional[str] = None,
+    ) -> None:
+        """Keep bytes on the local job tree without a remote upload.
+
+        Used by multipart ingress so the HTTP request can finish quickly; a
+        background job then calls ``put_file`` for durable store (GCS). The
+        filesystem backend treats stage as durable (``put_file``).
+        """
+        self.put_file(
+            job_id,
+            relpath,
+            path,
+            last_modified_ts,
+            owner_id=owner_id,
+        )
+
     @abstractmethod
     def materialize(
         self,
