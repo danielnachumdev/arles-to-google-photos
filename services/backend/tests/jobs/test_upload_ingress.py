@@ -1,4 +1,4 @@
-"""TDD: streaming multipart album ingress (memory-safe cloud durable put)."""
+"""TDD: streaming multipart album ingress (no full local staging tree)."""
 from __future__ import annotations
 
 import io
@@ -29,11 +29,12 @@ class TestPeekGalleryTitleFromParts:
         ]
         title = peek_gallery_title_from_parts(parts)
         assert title == "2/8/2012 - mini fixture"
+        # Streams remain readable for a later accept pass.
         assert parts[1].stream.tell() == 0 or parts[1].stream.seek(0) == 0
 
 
 class TestMultipartAlbumIngress:
-    def test_cloud_puts_each_part_during_request_then_enqueues_prepare(
+    def test_streams_parts_into_gcs_without_full_staging_tree(
         self, tmp_path: Path
     ) -> None:
         gcs = FakeGcsClient()
@@ -93,10 +94,16 @@ class TestMultipartAlbumIngress:
         ingest.start.assert_called_once()
         assert ingest.start.call_args.kwargs["title"] == "2/8/2012 - mini fixture"
         assert store.put_album_file.call_count == 3
-        store.stage_album_file.assert_not_called()
         assert submitted == ["job-1"]
         ingest.finish_prepared.assert_called_once_with("job-1", overwrite=False)
 
+        # No leftover staging directory under jobs_root.
+        staging_dirs = [
+            p for p in tmp_path.iterdir() if p.is_dir() and p.name.startswith("arles-upload-")
+        ]
+        assert staging_dirs == []
+
+        # Durable objects in GCS; local media is placeholder only.
         assert artifacts.exists("job-1", "hrimages/20120802_01hr.JPG", owner_id="owner-1")
         cache_media = tmp_path / "cache" / "job-1" / "hrimages" / "20120802_01hr.JPG"
         assert cache_media.is_file()
@@ -108,41 +115,10 @@ class TestMultipartAlbumIngress:
             == jpeg
         )
 
-    def test_local_fs_stages_without_inline_store_events(
+    def test_iter_ingest_yields_store_progress_then_complete(
         self, tmp_path: Path
     ) -> None:
         store = MagicMock()
-        store.retains_full_local_tree.return_value = True
-        ingest = MagicMock()
-        ingest.start.return_value = "job-1"
-        ingest.finish_prepared.return_value = "job-1"
-        emitted: list = []
-
-        def emit(job_id: str, stage: str, message: str = "", **kwargs) -> None:
-            emitted.append((job_id, stage, message, kwargs))
-
-        ingress = MultipartAlbumIngress(
-            store=store,
-            ingest=ingest,
-            jobs_root=tmp_path,
-            submit=lambda _jid, fn: fn(),
-            events_emit=emit,
-        )
-        parts = [
-            AlbumUploadPart("index.html", io.BytesIO(b"<html></html>"), None),
-            AlbumUploadPart("a.jpg", io.BytesIO(b"\xff\xd8"), None),
-        ]
-        events = list(ingress.iter_ingest(parts, owner_id="o"))
-        assert [e["event"] for e in events] == ["complete"]
-        assert store.stage_album_file.call_count == 2
-        assert store.put_album_file.call_count == 0
-        assert emitted == []
-
-    def test_cloud_iter_ingest_yields_store_progress_then_complete(
-        self, tmp_path: Path
-    ) -> None:
-        store = MagicMock()
-        store.retains_full_local_tree.return_value = False
         ingest = MagicMock()
         ingest.start.return_value = "job-1"
         ingest.finish_prepared.return_value = "job-1"
@@ -165,7 +141,11 @@ class TestMultipartAlbumIngress:
         events = list(ingress.iter_ingest(parts, owner_id="o"))
         assert [e["event"] for e in events] == ["store", "store", "complete"]
         assert events[0]["current"] == 1 and events[0]["total"] == 2
+        assert events[1]["current"] == 2 and events[1]["total"] == 2
+        assert events[2]["job_id"] == "job-1"
         assert store.put_album_file.call_count == 2
+        assert len(emitted) == 2
+        assert emitted[0][0] == "job-1"
         assert emitted[0][2] == "Storing files"
         assert emitted[1][3]["current"] == 2
 
@@ -197,4 +177,3 @@ class TestMultipartAlbumIngress:
                 owner_id="o",
             )
         store.put_album_file.assert_not_called()
-        store.stage_album_file.assert_not_called()

@@ -117,8 +117,7 @@ export class MigrationClient {
     const { status, bodyText } = await postFormData(`${this.baseUrl}/jobs${query}`, form, {
       onProgress: options?.onUploadProgress,
       onStoreProgress: options?.onStoreProgress,
-      // Cloud may stream durable-put progress after the browser upload hits 100%.
-      streamStoreProgress: Boolean(options?.onStoreProgress),
+      streamStoreProgress: true,
     })
 
     if (status === 409) {

@@ -133,12 +133,12 @@ async def create_job(
     ``overwrite=true`` folds into the existing job (keeps id / created_at /
     product_url).
 
-    Each multipart part is streamed into durable storage one file at a time on
-    cloud backends (no full album tree in container memory). Local FS stages
-    onto disk. Preview parse is enqueued on the orchestrator before the
-    response finishes. With ``Accept: application/x-ndjson``, cloud uploads may
-    stream ``store`` progress then ``done``; otherwise a JSON job body is
-    returned after accept completes.
+    Each multipart part is streamed into durable storage one file at a time
+    (no full album staging tree on local disk). With
+    ``Accept: application/x-ndjson``, the response streams ``store`` progress
+    lines then a final ``done`` event with the job; otherwise a single JSON job
+    body is returned after storage completes. Preview prep is always enqueued
+    on the job orchestrator before the response finishes.
     """
     parts = _album_parts_from_form(form)
     access_token = _form_optional_str(form, "access_token")

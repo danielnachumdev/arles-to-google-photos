@@ -274,11 +274,9 @@ export function AlbumWorkbench({
       return
     }
     const intervalId = window.setInterval(() => {
-      void Promise.all([
-        client.getJob(jobId),
-        client.getJobHistory(jobId, { audience: 'ui' }).catch(() => []),
-      ])
-        .then(([next, events]) => {
+      void client
+        .getJob(jobId)
+        .then((next) => {
           applyJob(next)
           if (
             !jobHasAlbumDesk(next) &&
@@ -292,7 +290,6 @@ export function AlbumWorkbench({
             }
           }
           if (next.status === 'failed' || next.status === 'cancelled') {
-            setUploadProgress(null)
             setPhase('failed')
             setError(
               next.status === 'cancelled'
@@ -302,36 +299,13 @@ export function AlbumWorkbench({
             return
           }
           if (next.preview && next.status === 'done') {
-            setUploadProgress(null)
             setPhase('preview')
             setStatusLine(t.previewReady)
             return
           }
           if (!next.preview) {
             setPhase('working')
-            const last = events.length > 0 ? events[events.length - 1] : null
-            if (
-              last &&
-              last.message === 'Storing files' &&
-              last.total > 0
-            ) {
-              const percent = Math.min(
-                100,
-                Math.round((last.current / last.total) * 100),
-              )
-              setUploadProgress({
-                phase: 'store',
-                current: last.current,
-                total: last.total,
-                percent,
-              })
-              setStatusLine(
-                t.storingFilesProgress(last.current, last.total, percent),
-              )
-            } else {
-              setUploadProgress(null)
-              setStatusLine(t.preparing)
-            }
+            setStatusLine(t.preparing)
           }
         })
         .catch(() => undefined)

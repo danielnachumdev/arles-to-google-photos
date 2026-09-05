@@ -146,8 +146,7 @@ class GcsArtifactStore(ArtifactStore):
         if Path(safe_rel).name in STATE_FILE_NAMES:
             dest = JobWorkspace(root)._resolve_inside_root(safe_rel)
             dest.parent.mkdir(parents=True, exist_ok=True)
-            if source.resolve() != dest.resolve():
-                shutil.copyfile(source, dest)
+            shutil.copyfile(source, dest)
             return
         blob = self._blob(job_id, safe_rel, owner_id=owner_id)
         meta: Dict[str, str] = {_SIZE_META_KEY: str(size)}
@@ -169,46 +168,9 @@ class GcsArtifactStore(ArtifactStore):
             return
         dest = JobWorkspace(root)._resolve_inside_root(safe_rel)
         dest.parent.mkdir(parents=True, exist_ok=True)
-        if source.resolve() != dest.resolve():
-            shutil.copyfile(source, dest)
+        shutil.copyfile(source, dest)
         if last_modified_ts is not None:
             os.utime(dest, (last_modified_ts, last_modified_ts))
-
-    def stage_file(
-        self,
-        job_id: str,
-        relpath: str,
-        path: Path,
-        last_modified_ts: Optional[float] = None,
-        *,
-        owner_id: Optional[str] = None,
-    ) -> None:
-        """Copy onto the local cache with full bytes; do not upload to GCS yet."""
-        del owner_id  # staging is always under the local job cache root
-        safe_rel = validate_relpath(relpath)
-        root = self._cache_root(job_id)
-        root.mkdir(parents=True, exist_ok=True)
-        dest = JobWorkspace(root)._resolve_inside_root(safe_rel)
-        dest.parent.mkdir(parents=True, exist_ok=True)
-        source = Path(path)
-        if source.resolve() != dest.resolve():
-            shutil.copyfile(source, dest)
-        if last_modified_ts is not None:
-            os.utime(dest, (last_modified_ts, last_modified_ts))
-        if Path(safe_rel).name in STATE_FILE_NAMES:
-            return
-        if self._classifier.is_media(safe_rel):
-            sparse = SparseAlbumWorkspace(root, classifier=self._classifier)
-            index = MediaIndex.read(root)
-            index.put(
-                safe_rel,
-                MediaIndexEntry(
-                    size_bytes=int(dest.stat().st_size),
-                    mtime=last_modified_ts,
-                ),
-            )
-            sparse.write_media_index(index)
-            clear_media_index_cache()
 
     def materialize(
         self,
