@@ -144,14 +144,48 @@ class TestHistoryAndIngestEdges(ApiClientSuite):
     def test_last_modified_form_field_is_accepted(self, tmp_path: Path) -> None:
         api = self.make_api(tmp_path)
         stamp_ms = int(datetime(2012, 8, 2, 12, 0, tzinfo=timezone.utc).timestamp() * 1000)
-        files = AlbumTree.mini_multipart()
-        response = api.client.post(
-            f"/api/jobs?lastModified={stamp_ms}&lastModified={stamp_ms}&lastModified={stamp_ms}",
-            files=files,
-        )
+        files = list(AlbumTree.mini_multipart())
+        files.extend(("lastModified", (None, str(stamp_ms))) for _ in range(len(files)))
+        response = api.client.post("/api/jobs", files=files)
         assert response.status_code == 201, response.text
         job = api.wait_job(response.json()["id"])
         assert job["status"] == "done"
+
+    def test_album_upload_allows_more_than_starlette_default_file_cap(
+        self, tmp_path: Path
+    ) -> None:
+        """Starlette defaults to 1000 files; album hubs need a higher cap."""
+        from src.api.routers import jobs as jobs_router
+
+        api = self.make_api(tmp_path)
+        index = (
+            b"<!DOCTYPE html><html><body>"
+            b'<span class="gallerytitle">Big hub</span>'
+            b"</body></html>"
+        )
+        files: list = [("files", ("index.html", index, "text/html"))]
+        # Just over Starlette's default max_files=1000 (index + 1001 pads).
+        for i in range(1001):
+            files.append(
+                (
+                    "files",
+                    (f"hrimages/pad_{i:04d}hr.JPG", b"\xff\xd8\xff\xd9", "image/jpeg"),
+                )
+            )
+        file_count = sum(1 for name, _ in files if name == "files")
+        files.extend(
+            ("lastModified", (None, str(1_700_000_000_000 + i)))
+            for i in range(file_count)
+        )
+        assert file_count == 1002
+        assert jobs_router.MULTIPART_MAX_FILES >= file_count
+        assert jobs_router.MULTIPART_MAX_FIELDS >= file_count
+        response = api.client.post("/api/jobs", files=files)
+        assert "Too many files" not in response.text
+        assert "Maximum number of files is 1000" not in response.text
+        # Missing imagepages → parse may fail after accept; multipart must parse.
+        assert response.status_code in {201, 400}, response.text
+
 
     def test_default_gp_factory_is_invoked_on_publish(self, tmp_path: Path) -> None:
         from src.api.app import create_app

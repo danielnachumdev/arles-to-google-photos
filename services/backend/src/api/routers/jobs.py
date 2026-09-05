@@ -4,8 +4,9 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Body, Depends, File, Form, HTTPException, Query, UploadFile
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request, UploadFile
 from fastapi.responses import FileResponse
+from starlette.datastructures import FormData
 
 from ...export.editor import PreviewEdits
 from ...export.media_kinds import (
@@ -45,14 +46,40 @@ from ..schemas import PreviewEditBody, ReprocessBody, RestartBody
 
 router = APIRouter(prefix="/api/jobs", tags=["jobs"])
 
+# Starlette defaults are 1000 (DoS guard). Large Arles hubs exceed that; raise
+# for album ingest only (parsed via request.form, not File()/Form() defaults).
+MULTIPART_MAX_FILES = 10_000
+MULTIPART_MAX_FIELDS = 10_000
+
+
+async def _album_upload_form(request: Request) -> FormData:
+    return await request.form(
+        max_files=MULTIPART_MAX_FILES,
+        max_fields=MULTIPART_MAX_FIELDS,
+    )
+
+
+def _form_uploads(form: FormData) -> List[UploadFile]:
+    uploads: List[UploadFile] = []
+    for item in form.getlist("files"):
+        # Duck-type: TestClient / Starlette may not match fastapi.UploadFile isinstance.
+        if hasattr(item, "filename") and hasattr(item, "file"):
+            uploads.append(item)  # type: ignore[arg-type]
+    return uploads
+
+
+def _form_optional_str(form: FormData, key: str) -> Optional[str]:
+    raw = form.get(key)
+    if raw is None or hasattr(raw, "filename"):
+        return None
+    return str(raw)
+
 
 @router.post("", status_code=201)
 async def create_job(
-    files: List[UploadFile] = File(...),
-    lastModified: Optional[List[Optional[str]]] = None,
     overwrite: bool = Query(False),
     auto_publish: bool = Query(False),
-    access_token: Optional[str] = Form(None),
+    form: FormData = Depends(_album_upload_form),
     deps: ApiDependencies = Depends(get_deps),
     user: UserRecord = Depends(get_current_user),
 ) -> Dict[str, Any]:
@@ -66,11 +93,18 @@ async def create_job(
     Each multipart part is streamed into durable storage one file at a time
     (no full album staging tree on local disk).
     """
+    files = _form_uploads(form)
+    if not files:
+        raise HTTPException(status_code=400, detail="files required")
+    access_token = _form_optional_str(form, "access_token")
     if auto_publish and not (access_token or "").strip():
         raise HTTPException(
             status_code=400, detail="google access token required"
         )
-    mtimes = lastModified or []
+    mtimes = [
+        None if hasattr(value, "filename") else value
+        for value in form.getlist("lastModified")
+    ]
     parts: List[AlbumUploadPart] = []
     for index, upload in enumerate(files):
         raw_mtime = mtimes[index] if index < len(mtimes) else None
