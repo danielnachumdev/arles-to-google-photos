@@ -24,6 +24,7 @@ export type MessageCatalog = {
   loadingAlbums: string
   loadingJobs: string
   loadingSettings: string
+  loadingThumbnail: string
 
   notFoundHeading: string
   notFoundLede: string

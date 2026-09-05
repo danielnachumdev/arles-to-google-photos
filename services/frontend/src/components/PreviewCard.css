@@ -76,6 +76,8 @@
 .preview-card__thumb-wrap {
   position: relative;
   display: block;
+  min-height: 0;
+  background: color-mix(in srgb, var(--mist) 10%, var(--surface));
 }
 
 .preview-card__thumb,
@@ -85,6 +87,23 @@
   aspect-ratio: 4 / 3;
   max-height: 10rem;
   object-fit: cover;
+  pointer-events: none;
+}
+
+.preview-card__thumb {
+  opacity: 0;
+  transition: opacity 0.22s var(--ease);
+}
+
+.preview-card__thumb--ready {
+  opacity: 1;
+}
+
+.preview-card__thumb-spinner {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
   pointer-events: none;
 }
 
@@ -237,5 +256,9 @@
 @media (prefers-reduced-motion: reduce) {
   .preview-card:hover {
     transform: none;
+  }
+
+  .preview-card__thumb {
+    transition: none;
   }
 }

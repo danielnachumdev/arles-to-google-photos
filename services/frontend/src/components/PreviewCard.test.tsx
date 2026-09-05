@@ -268,6 +268,35 @@ describe('PreviewCard', () => {
 
     expect(container.querySelector('img.preview-card__thumb')).toBeNull()
     expect(container.querySelector('.preview-card__video-placeholder')).toBeTruthy()
+    expect(container.querySelector('.preview-card__thumb-spinner')).toBeNull()
     expect(container.querySelector('.preview-card__video-badge')?.textContent).toBe(t.videoBadge)
+  })
+
+  it('shows a spinner until the thumbnail image finishes loading', () => {
+    const { container } = render(
+      <ul>
+        <PreviewCard
+          index={1}
+          item={ITEM}
+          thumbUrl="/api/jobs/job-1/media/20120802_01?variant=thumb"
+          caption={ITEM.caption}
+          onCaption={() => undefined}
+          onOpenPreview={() => undefined}
+        />
+      </ul>,
+    )
+
+    const wrap = container.querySelector('.preview-card__thumb-wrap')
+    const image = container.querySelector('img.preview-card__thumb')
+    expect(wrap).toHaveAttribute('aria-busy', 'true')
+    expect(container.querySelector('.preview-card__thumb-spinner')).toBeTruthy()
+    expect(screen.getByText(t.loadingThumbnail)).toBeInTheDocument()
+    expect(image).not.toHaveClass('preview-card__thumb--ready')
+
+    fireEvent.load(image!)
+
+    expect(wrap).not.toHaveAttribute('aria-busy')
+    expect(container.querySelector('.preview-card__thumb-spinner')).toBeNull()
+    expect(image).toHaveClass('preview-card__thumb--ready')
   })
 })

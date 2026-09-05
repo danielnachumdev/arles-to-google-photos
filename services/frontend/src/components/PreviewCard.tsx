@@ -1,4 +1,4 @@
-import { useId, useLayoutEffect, useRef } from 'react'
+import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import type { PreviewItem } from '../api/types.ts'
 import { t } from '../lib/language.ts'
 import {
@@ -8,6 +8,7 @@ import {
 } from '../lib/previewMedia.ts'
 import { ModifiedMark } from './ModifiedMark.tsx'
 import './PreviewCard.css'
+import './LoadingSpinner.css'
 
 function syncNoteHeight(el: HTMLTextAreaElement): void {
   el.style.height = 'auto'
@@ -39,11 +40,17 @@ export function PreviewCard({
   const captionId = useId()
   const modifiedId = useId()
   const noteRef = useRef<HTMLTextAreaElement>(null)
+  const thumbRef = useRef<HTMLImageElement>(null)
+  const [thumbReady, setThumbReady] = useState(false)
   const takenDay = item.taken_on?.slice(0, 10) ?? null
   const mtimeDay = item.last_modified?.slice(0, 10) ?? null
   const datesDiffer = Boolean(
     showDateMismatch && takenDay && mtimeDay && takenDay !== mtimeDay,
   )
+
+  useEffect(() => {
+    setThumbReady(false)
+  }, [thumbUrl])
 
   useLayoutEffect(() => {
     const el = noteRef.current
@@ -52,9 +59,17 @@ export function PreviewCard({
     }
   }, [caption])
 
+  useLayoutEffect(() => {
+    const img = thumbRef.current
+    if (img?.complete && img.naturalWidth > 0) {
+      setThumbReady(true)
+    }
+  }, [thumbUrl])
+
   const descriptionLabel = previewDescriptionLabel(item, t)
   const openPreviewAria = previewOpenAria(item, t)
   const isVideo = previewItemKind(item) === 'video'
+  const thumbLoading = Boolean(thumbUrl) && !thumbReady
 
   return (
     <li className="preview-card">
@@ -72,12 +87,37 @@ export function PreviewCard({
         aria-label={openPreviewAria}
         onClick={onOpenPreview}
       >
-        <span className="preview-card__thumb-wrap">
+        <span
+          className="preview-card__thumb-wrap"
+          aria-busy={thumbLoading || undefined}
+        >
           {thumbUrl ? (
-            <img className="preview-card__thumb" src={thumbUrl} alt="" width={160} loading="lazy" />
+            <img
+              ref={thumbRef}
+              className={
+                thumbReady
+                  ? 'preview-card__thumb preview-card__thumb--ready'
+                  : 'preview-card__thumb'
+              }
+              src={thumbUrl}
+              alt=""
+              width={160}
+              loading="lazy"
+              decoding="async"
+              onLoad={() => setThumbReady(true)}
+              onError={() => setThumbReady(true)}
+            />
           ) : (
             <span className="preview-card__video-placeholder" aria-hidden="true" />
           )}
+          {thumbLoading ? (
+            <>
+              <span className="preview-card__thumb-spinner" aria-hidden="true">
+                <span className="loading-spinner__mark" />
+              </span>
+              <span className="visually-hidden">{t.loadingThumbnail}</span>
+            </>
+          ) : null}
           {isVideo ? (
             <span className="preview-card__video-badge">{t.videoBadge}</span>
           ) : null}

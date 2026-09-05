@@ -20,6 +20,7 @@ export const he: MessageCatalog = {
   loadingAlbums: 'טוען אלבומים שמורים…',
   loadingJobs: 'טוען הרצות…',
   loadingSettings: 'טוען הגדרות…',
+  loadingThumbnail: 'טוען תמונה ממוזערת…',
 
   notFoundHeading: 'העמוד לא נמצא',
   notFoundLede: 'ייתכן שהקישור אינו תקין, או שאין לך גישה לעמוד זה.',

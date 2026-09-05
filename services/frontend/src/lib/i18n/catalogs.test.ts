@@ -233,6 +233,7 @@ describe('i18n catalogs', () => {
       expect(catalog.loadingAlbums).toBeTruthy()
       expect(catalog.loadingJobs).toBeTruthy()
       expect(catalog.loadingSettings).toBeTruthy()
+      expect(catalog.loadingThumbnail).toBeTruthy()
       expect(catalog.fileCount(1)).toBeTruthy()
       expect(catalog.fileCount(3)).toBeTruthy()
       expect(catalog.sendingFiles(3)).toContain('3')

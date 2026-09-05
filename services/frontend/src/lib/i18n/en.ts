@@ -20,6 +20,7 @@ export const en: MessageCatalog = {
   loadingAlbums: 'Loading saved albums…',
   loadingJobs: 'Loading jobs…',
   loadingSettings: 'Loading settings…',
+  loadingThumbnail: 'Loading thumbnail…',
 
   notFoundHeading: 'Page not found',
   notFoundLede:
