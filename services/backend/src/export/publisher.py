@@ -99,7 +99,7 @@ class AlbumPublisher:
             for item in batch_items:
                 raise_if_cancelled(sink)
                 absolute_index = done
-                path = resolve_path(item.relpath)
+                path = _resolve_media_path(resolve_path, item)
                 prev = self._stamper.stamp_path(
                     path,
                     item,
@@ -130,6 +130,31 @@ class AlbumPublisher:
 
 
 _ADD_TEXT_PART_LIMIT = 1000
+
+
+def _resolve_media_path(resolve_path: PathResolver, item: PreviewItem) -> Path:
+    """Resolve one preview item for upload; raise a clear error if missing."""
+    try:
+        path = resolve_path(item.relpath)
+    except FileNotFoundError as exc:
+        missing = str(exc).strip() or item.relpath
+        raise FileNotFoundError(
+            f"Could not load photo '{item.id}' for Google Photos upload "
+            f"({item.relpath}). File missing from storage"
+            + (f": {missing}" if missing != item.relpath else "")
+            + "."
+        ) from exc
+    except OSError as exc:
+        raise OSError(
+            f"Could not load photo '{item.id}' for Google Photos upload "
+            f"({item.relpath}): {exc}"
+        ) from exc
+    if not path.is_file() or path.stat().st_size <= 0:
+        raise FileNotFoundError(
+            f"Could not load photo '{item.id}' for Google Photos upload "
+            f"({item.relpath}). File missing or empty on the server."
+        )
+    return path
 
 
 def _create_album(gp: GooglePhotos, title: str) -> Album:

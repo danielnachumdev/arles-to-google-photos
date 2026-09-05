@@ -154,3 +154,52 @@ class TestFolderHubFanOut(JobStoreSuite):
         parent_after = store.get(parent.id)
         assert parent_after.status == STATUS_DONE
         assert set(submitted) == set(child_ids)
+
+    def test_upload_from_hub_leaf_resolves_nested_media(self) -> None:
+        store = JobStore.load(self.tmp_path)
+        hub = self.tmp_path / "album_src"
+        _write_redirect_hub(hub)
+        _write_leaf(hub / "Aug19", title="Aug 19", item_id="0809_2_19_01")
+
+        parent = store.create(self.tmp_path, folder_label="0809_2")
+        files = []
+        for path in hub.rglob("*"):
+            if path.is_file():
+                rel = path.relative_to(hub).as_posix()
+                files.append((rel, path.read_bytes(), None))
+        store.materialize_album(parent.id, files)
+        store.set_status(parent.id, STATUS_RUNNING, job_type=TYPE_PREVIEW)
+
+        events = JobEventBus()
+        ingest = IngestService(
+            store=store,
+            parser=AlbumExportParser(),
+            events=events,
+            workspace=JobWorkspace,
+        )
+
+        def submit(job_id: str, fn) -> None:
+            fn()
+
+        root = store.ensure_local_root(parent.id)
+        plan = FolderHubDetector().detect(root)
+        child_ids = FolderHubFanOut(
+            store=store,
+            jobs_root=self.tmp_path,
+            submit=submit,
+            run_child=lambda cid: ingest.finish_prepared(cid),
+            events_emit=events.emit,
+        ).apply(parent.id, plan)
+        assert len(child_ids) == 1
+        leaf = store.get(child_ids[0])
+        assert leaf.preview is not None
+        item = leaf.preview.items[0]
+        assert item.relpath == "hrimages/0809_2_19_01hr.JPG"
+
+        upload = store.create_upload_from(leaf.id)
+        assert (upload.extra or {}).get(ALBUM_RELPATH_KEY) == "Aug19"
+        assert upload.root.name == "Aug19"
+        resolved = store.ensure_artifact_file(upload.id, item.relpath)
+        assert resolved.is_file()
+        assert resolved.stat().st_size > 0
+        assert resolved.as_posix().endswith("Aug19/hrimages/0809_2_19_01hr.JPG")

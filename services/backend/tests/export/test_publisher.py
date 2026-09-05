@@ -5,6 +5,7 @@ from datetime import date
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+import pytest
 from gp_wrapper import PositionType
 
 from src.export.preview import AlbumJournal, AlbumPreview, PreviewItem
@@ -464,4 +465,29 @@ class TestAlbumPublisher(PublisherSuite):
             )
             album, _media = _publish_with_album(tmp_path, preview)
             album.add_text.assert_not_called()
+
+    def test_publish_missing_file_raises_clear_message(self, tmp_path: Path) -> None:
+        from src.export.publisher import AlbumPublisher
+
+        preview = _preview(_item("0809_2_19_01", "hrimages/0809_2_19_01hr.JPG"))
+        gp = MagicMock()
+        album = MagicMock()
+        album.id = "album-x"
+        with patch("src.export.publisher.Album") as AlbumCls, patch(
+            "src.export.publisher.MediaItem"
+        ):
+            AlbumCls.create.return_value = album
+
+            def missing(_rel: str) -> Path:
+                raise FileNotFoundError("hrimages/0809_2_19_01hr.JPG")
+
+            with pytest.raises(FileNotFoundError, match="Could not load photo") as caught:
+                AlbumPublisher().publish(
+                    gp,
+                    tmp_path,
+                    preview,
+                    resolve=missing,
+                )
+        assert "0809_2_19_01" in str(caught.value)
+        assert "hrimages/0809_2_19_01hr.JPG" in str(caught.value)
 

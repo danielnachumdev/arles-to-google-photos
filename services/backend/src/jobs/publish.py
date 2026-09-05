@@ -230,10 +230,11 @@ class PublishService:
             if store_is_cancelled(self._store, upload_id):
                 self._mark_cancelled(upload_id)
                 return ""
+            message = _format_publish_failure(exc)
             self._store.set_status(
-                upload_id, STATUS_FAILED, error=str(exc), job_type=TYPE_UPLOAD
+                upload_id, STATUS_FAILED, error=message, job_type=TYPE_UPLOAD
             )
-            self._events.emit(upload_id, "error", str(exc))
+            self._events.emit(upload_id, "error", message)
             raise
 
     def _mark_cancelled(self, upload_id: str) -> None:
@@ -242,3 +243,20 @@ class PublishService:
             return
         self._store.set_status(upload_id, STATUS_CANCELLED, job_type=TYPE_UPLOAD)
         self._events.emit(upload_id, "cancelled", "Job cancelled")
+
+
+def _format_publish_failure(exc: BaseException) -> str:
+    """Human-readable publish failure for job.error / SSE (not a bare path)."""
+    text = str(exc).strip() or type(exc).__name__
+    if isinstance(exc, FileNotFoundError):
+        if text.lower().startswith("could not load photo"):
+            return text
+        return (
+            f"Could not load a photo for Google Photos upload ({text}). "
+            "The file is missing from server storage."
+        )
+    if isinstance(exc, OSError) and not isinstance(exc, FileNotFoundError):
+        if text.lower().startswith("could not load photo"):
+            return text
+        return f"Could not read a photo for Google Photos upload: {text}"
+    return text

@@ -653,14 +653,20 @@ class JobStore:
     ) -> Job:
         if events is None:
             events = self._require_state().list_events(record.id)
+        from .folder_hub import album_relpath_of
+
         artifact_id = record.source_job_id or record.id
+        # Do not hydrate from GCS here: JobStore.load walks every job and
+        # would download all album bytes before uvicorn can bind (Cloud Run).
+        root = self._require_artifacts().local_root(
+            artifact_id, owner_id=record.owner_id, hydrate=False
+        )
+        album_rel = album_relpath_of(record)
+        if album_rel:
+            root = root / album_rel
         return Job(
             id=record.id,
-            # Do not hydrate from GCS here: JobStore.load walks every job and
-            # would download all album bytes before uvicorn can bind (Cloud Run).
-            root=self._require_artifacts().local_root(
-                artifact_id, owner_id=record.owner_id, hydrate=False
-            ),
+            root=root,
             status=record.status,
             type=record.type,
             preview=record.preview,
@@ -916,6 +922,9 @@ class JobStore:
                 number=self._require_state().allocate_number(),
                 import_origin=origin,
                 owner_id=source.owner_id,
+                # Hub leaf previews store files under extra.album_relpath on the
+                # shared parent tree; upload must keep that prefix to resolve media.
+                extra=parse_extra(source.extra),
             )
         self._require_state().create(record)
         job = self._to_job(record, events=[])
