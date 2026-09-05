@@ -1466,4 +1466,47 @@ describe('AlbumWorkbench structure fallback', () => {
     ).toBeInTheDocument()
     expect(document.querySelector('.workbench__structure-warning')).toBeTruthy()
   })
+
+  it('redirects a folder hub parent to the first leaf album', async () => {
+    const hubId = 'hub-parent'
+    const leafId = 'leaf-aug10'
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.endsWith(`/api/jobs/${hubId}`) && (!url.includes('?') || url.includes('/api/jobs/'))) {
+        return jsonResponse({
+          id: hubId,
+          status: 'waiting',
+          type: 'preview',
+          error: null,
+          product_url: null,
+          preview: null,
+          preview_job_id: leafId,
+          folder_label: 'Italy2012',
+          child_ids: [leafId],
+        } satisfies Job)
+      }
+      if (url.endsWith(`/api/jobs/${leafId}`)) {
+        return jsonResponse(
+          JobBuilder.preview({
+            id: leafId,
+            status: 'done',
+            preview: {
+              title: 'Aug10',
+              description: null,
+              multi_index: false,
+              journal: null,
+              items: [],
+            },
+          }).build(),
+        )
+      }
+      return jsonResponse({ detail: 'not found' }, 404)
+    })
+
+    const { router } = harness.renderWorkbench(hubId)
+
+    await waitFor(() => {
+      expect(router.state.location.pathname).toBe(`/albums/${leafId}`)
+    })
+  })
 })

@@ -18,7 +18,12 @@ import { ModifiedMark } from '../components/ModifiedMark.tsx'
 import { PreviewCard } from '../components/PreviewCard.tsx'
 import { jobFilesFromDirectory } from '../lib/collectFolder.ts'
 import { explainCaughtError, isNotFoundError } from '../lib/formatApiError.ts'
-import { inferImportOrigin, jobErrorMessage } from '../lib/jobFields.ts'
+import {
+  albumDeskJobId,
+  inferImportOrigin,
+  jobErrorMessage,
+  jobHasAlbumDesk,
+} from '../lib/jobFields.ts'
 import { GoogleAuthCancelledError, requestGooglePhotosAccessToken } from '../lib/googleAuth.ts'
 import { withGooglePhotosAccessToken } from '../lib/withGooglePhotosToken.ts'
 import { isJobCancellable } from '../lib/formatJobDuration.ts'
@@ -208,6 +213,13 @@ export function AlbumWorkbench({
         }
         applyJob(next)
         setUploadRun(null)
+        if (!jobHasAlbumDesk(next) && next.status !== 'pending' && next.status !== 'running') {
+          const deskId = albumDeskJobId(next)
+          if (deskId && deskId !== next.id) {
+            navigate(`/albums/${deskId}`, { replace: true })
+            return
+          }
+        }
         if (next.preview) {
           setPhase('preview')
           setStatusLine(t.previewReady)
@@ -266,6 +278,17 @@ export function AlbumWorkbench({
         .getJob(jobId)
         .then((next) => {
           applyJob(next)
+          if (
+            !jobHasAlbumDesk(next) &&
+            next.status !== 'pending' &&
+            next.status !== 'running'
+          ) {
+            const deskId = albumDeskJobId(next)
+            if (deskId && deskId !== next.id) {
+              navigate(`/albums/${deskId}`, { replace: true })
+              return
+            }
+          }
           if (next.status === 'failed' || next.status === 'cancelled') {
             setPhase('failed')
             setError(

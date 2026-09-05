@@ -8,7 +8,10 @@ from typing import Any, Callable, Iterable, Mapping, Optional, Protocol, Tuple
 from bs4 import BeautifulSoup
 from bs4.element import Tag
 
-from ..export.parser import STRUCTURE_FALLBACK_WARNING
+from ..export.parser import (
+    STRUCTURE_FALLBACK_WARNING,
+    gallery_title_from_element,
+)
 from ..export.preview import AlbumPreview
 from ..export.video_preview import (
     ensure_local_video_previews,
@@ -43,8 +46,7 @@ def peek_gallery_title(files: Iterable[FileTuple]) -> Optional[str]:
         soup = BeautifulSoup(text, features="html.parser")
         title_el = soup.find("span", class_="gallerytitle")
         if isinstance(title_el, Tag) and title_el.get_text(strip=True):
-            cleaned = title_el.get_text().replace("\xa0", " ")
-            title = " ".join(cleaned.split())
+            title = gallery_title_from_element(title_el)
             return title or None
         return None
     return None

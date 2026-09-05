@@ -895,6 +895,59 @@ describe('JobDetail', () => {
     ).toBe(true)
   })
 
+  it('links a done folder hub parent to the first leaf album desk', async () => {
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url.includes('/history')) {
+        return jsonResponse({ events: [] })
+      }
+      if (url.endsWith('/children')) {
+        return jsonResponse({
+          children: [
+            {
+              id: 'leaf-aug10',
+              status: 'done',
+              type: 'preview',
+              title: 'Aug10',
+              preview: {
+                title: 'Aug10',
+                description: null,
+                multi_index: false,
+                journal: null,
+                items: [],
+              },
+            },
+          ],
+        })
+      }
+      if (url.includes('/api/jobs/hub-parent')) {
+        return jsonResponse({
+          id: 'hub-parent',
+          status: 'done',
+          type: 'preview',
+          error: null,
+          product_url: null,
+          preview: null,
+          preview_job_id: 'leaf-aug10',
+          folder_label: 'Italy2012',
+        } satisfies Job)
+      }
+      return jsonResponse({ detail: 'not found' }, 404)
+    })
+
+    render(
+      <MemoryRouter>
+        <JobDetail jobId="hub-parent" />
+      </MemoryRouter>,
+    )
+
+    const albumLinks = await screen.findAllByRole('link', { name: t.openAlbum })
+    expect(albumLinks.map((link) => link.getAttribute('href'))).toEqual([
+      '/albums/leaf-aug10',
+      '/albums/leaf-aug10',
+    ])
+  })
+
   it('shows cancel while pending, running, or waiting and posts cancel', async () => {
     const running: Job = {
       id: 'job-run',

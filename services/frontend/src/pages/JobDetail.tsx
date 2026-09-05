@@ -80,8 +80,10 @@ function albumDeskHref(job: Job, children: JobChild[]): string | null {
     const childId = previewChildId(job, children)
     return childId ? `/albums/${childId}` : null
   }
+  // Folder hub / parent preview with no local album: open first leaf.
   if (!job.preview) {
-    return null
+    const childId = previewChildId(job, children)
+    return childId ? `/albums/${childId}` : null
   }
   return `/albums/${job.source_job_id ?? job.id}`
 }

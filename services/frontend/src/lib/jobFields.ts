@@ -125,10 +125,51 @@ export function childDisplayLabel(child: JobChild): string {
   return jobGalleryTitle(child) || child.id
 }
 
+/** True when this run belongs on the album desk (/albums/:id), not only Jobs. */
+export function jobHasAlbumDesk(job: {
+  type?: string | null
+  status?: string | null
+  preview?: { title?: string | null } | null
+  title?: string | null
+}): boolean {
+  if (job.preview?.title?.trim()) {
+    return true
+  }
+  // Leaf ingest still running — preview arrives when parse finishes.
+  if (
+    job.type === 'preview' &&
+    (job.status === 'pending' || job.status === 'running')
+  ) {
+    return true
+  }
+  return false
+}
+
+/**
+ * Job id to open on the album desk. Hub/scrape parents without their own
+ * preview use preview_job_id (first leaf child).
+ */
+export function albumDeskJobId(job: {
+  id: string
+  source_job_id?: string | null
+  preview_job_id?: string | null
+  preview?: { title?: string | null } | null
+  type?: string | null
+  status?: string | null
+  title?: string | null
+}): string | null {
+  if (jobHasAlbumDesk(job)) {
+    return job.source_job_id ?? job.id
+  }
+  const childId = job.preview_job_id?.trim()
+  return childId || null
+}
+
 export function childHasAlbumDesk(child: JobChild): boolean {
   if (child.preview?.title?.trim()) {
     return true
   }
+  // Summary rows may expose title without embedding full preview JSON.
   if (child.type === 'preview') {
     const title = child.title?.trim()
     return Boolean(title && !isHostnameLabel(title))

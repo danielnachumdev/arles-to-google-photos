@@ -637,6 +637,56 @@ class TestAlbumExportParser(ParserSuite):
         preview = AlbumExportParser().parse(tmp_path)
         assert preview.journal is None
 
+    def test_gallerytitle_small_trip_joined_rtl_with_colon(self, tmp_path: Path) -> None:
+        """Arles hub children: day title + <br><small>trip</small> must not smash."""
+        (tmp_path / "hrimages").mkdir()
+        (tmp_path / "imagepages").mkdir()
+        (tmp_path / "hrimages" / "20120802_01hr.JPG").write_bytes(b"jpeg")
+        (tmp_path / "imagepages" / "20120802_01.html").write_text(
+            '<html><body><div class="imagetitle">c</div></body></html>',
+            encoding="utf-8",
+        )
+        (tmp_path / "index.html").write_text(
+            """<!DOCTYPE html><html><body>
+  <span class="gallerytitle">פריז - מגדל אייפל<br><small>טיול לצרפת 9-23/9/2009</small></span>
+  <a href="imagepages/20120802_01.html"><img src="t.jpg"></a>
+</body></html>
+""",
+            encoding="utf-8",
+        )
+        preview = AlbumExportParser().parse(tmp_path)
+        assert preview.title == "טיול לצרפת 9-23/9/2009: פריז - מגדל אייפל"
+        assert "אייפלטיול" not in preview.title
+
+    def test_gallerytitle_small_trip_joined_ltr_with_colon(self, tmp_path: Path) -> None:
+        (tmp_path / "hrimages").mkdir()
+        (tmp_path / "imagepages").mkdir()
+        (tmp_path / "hrimages" / "20120802_01hr.JPG").write_bytes(b"jpeg")
+        (tmp_path / "imagepages" / "20120802_01.html").write_text(
+            '<html><body><div class="imagetitle">c</div></body></html>',
+            encoding="utf-8",
+        )
+        (tmp_path / "index.html").write_text(
+            """<!DOCTYPE html><html><body>
+  <span class="gallerytitle">Paris – Eiffel<br><small>Trip to France 2009</small></span>
+  <a href="imagepages/20120802_01.html"><img src="t.jpg"></a>
+</body></html>
+""",
+            encoding="utf-8",
+        )
+        preview = AlbumExportParser().parse(tmp_path)
+        assert preview.title == "Paris – Eiffel: Trip to France 2009"
+
+    def test_compose_gallery_title_helpers(self) -> None:
+        from src.export.parser import compose_gallery_title
+
+        assert compose_gallery_title("Day only") == "Day only"
+        assert compose_gallery_title("Paris", "Trip") == "Paris: Trip"
+        assert (
+            compose_gallery_title("פריז", "טיול לצרפת")
+            == "טיול לצרפת: פריז"
+        )
+
     @pytest.mark.skipif(
         not (DAY1_REAL / "index.html").is_file() or not (DAY1_REAL / "hrimages").is_dir(),
         reason="optional local album under data/ not present",

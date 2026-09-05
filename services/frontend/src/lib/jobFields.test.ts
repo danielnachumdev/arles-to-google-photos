@@ -5,6 +5,7 @@ import { t } from './language.ts'
 import {
   childDisplayLabel,
   childHasAlbumDesk,
+  albumDeskJobId,
   inferImportOrigin,
   isHostnameLabel,
   isWebImportJob,
@@ -12,6 +13,7 @@ import {
   jobErrorMessage,
   jobFolderLabel,
   jobGalleryTitle,
+  jobHasAlbumDesk,
   jobPhotoCount,
   jobPhotosUrl,
   jobScrapeUrl,
@@ -125,6 +127,35 @@ describe('job field helpers', () => {
     expect(childHasAlbumDesk(previewChild)).toBe(true)
     expect(childHasAlbumDesk(runningPreview)).toBe(false)
     expect(childHasAlbumDesk(scrapeChild)).toBe(false)
+  })
+
+  it('resolves album desk id to preview_job_id for hub parents', () => {
+    expect(
+      albumDeskJobId({
+        id: 'hub-parent',
+        type: 'preview',
+        status: 'waiting',
+        preview: null,
+        preview_job_id: 'leaf-aug10',
+      }),
+    ).toBe('leaf-aug10')
+    expect(
+      albumDeskJobId({
+        id: 'leaf',
+        type: 'preview',
+        status: 'done',
+        preview: { title: 'Aug10' },
+      }),
+    ).toBe('leaf')
+    expect(jobHasAlbumDesk({ type: 'preview', status: 'waiting', preview: null })).toBe(false)
+    expect(
+      albumDeskJobId({
+        id: 'hub-alone',
+        type: 'preview',
+        status: 'done',
+        preview: null,
+      }),
+    ).toBeNull()
   })
 
   it('returns photo count for preview and upload, never scrape', () => {

@@ -103,6 +103,64 @@ def _normalize_text(text: str) -> str:
     return " ".join(cleaned.split())
 
 
+def _is_rtl_text(text: str) -> bool:
+    """True when Hebrew/Arabic letters outnumber Latin letters."""
+    rtl = 0
+    ltr = 0
+    for char in text:
+        code = ord(char)
+        # Hebrew, Arabic, and presentation forms.
+        if 0x0590 <= code <= 0x08FF or 0xFB1D <= code <= 0xFEFC:
+            rtl += 1
+        elif char.isalpha():
+            ltr += 1
+    return rtl > ltr
+
+
+def compose_gallery_title(main: str, secondary: Optional[str] = None) -> str:
+    """Join Arles day title + trip subtitle with a clear separator.
+
+    Arles often puts the day album in the main ``.gallerytitle`` text and the
+    parent trip in a nested ``<small>``. Order follows script direction:
+    RTL → ``{trip}: {day}``; LTR → ``{day}: {trip}``.
+    """
+    main_n = _normalize_text(main or "")
+    sec_n = _normalize_text(secondary or "") if secondary else ""
+    if not sec_n:
+        return main_n
+    if not main_n:
+        return sec_n
+    if _is_rtl_text(main_n) or _is_rtl_text(sec_n):
+        return f"{sec_n}: {main_n}"
+    return f"{main_n}: {sec_n}"
+
+
+def gallery_title_from_element(title_el: Tag) -> str:
+    """Parse ``span.gallerytitle``, splitting out nested ``<small>`` trip text."""
+    small = title_el.find("small")
+    secondary: Optional[str] = None
+    if isinstance(small, Tag) and small.get_text(strip=True):
+        secondary = small.get_text(" ", strip=True)
+        parts: List[str] = []
+        for child in title_el.children:
+            if isinstance(child, Tag):
+                name = (child.name or "").lower()
+                if name in {"small", "br"}:
+                    continue
+                chunk = child.get_text(" ", strip=True)
+                if chunk:
+                    parts.append(chunk)
+            else:
+                chunk = str(child).strip()
+                if chunk:
+                    parts.append(chunk)
+        main = " ".join(parts)
+    else:
+        # Prefer an explicit separator so ``<br>`` does not smash words together.
+        main = title_el.get_text(" ", strip=True)
+    return compose_gallery_title(main, secondary)
+
+
 def _id_from_hr_stem(stem: str) -> str:
     return id_from_hr_stem(stem)
 
@@ -319,7 +377,7 @@ class AlbumExportParser:
         description: Optional[str] = None
 
         if isinstance(title_el, Tag) and title_el.get_text(strip=True):
-            title = _normalize_text(title_el.get_text())
+            title = gallery_title_from_element(title_el)
             if (
                 not multi_index
                 and isinstance(desc_el, Tag)
