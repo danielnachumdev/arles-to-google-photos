@@ -251,7 +251,7 @@ def _format_publish_failure(exc: BaseException) -> str:
     lowered = text.lower()
     if lowered.startswith("google photos rejected") or lowered.startswith(
         "could not load photo"
-    ):
+    ) or lowered.startswith("could not prepare"):
         return text
     if isinstance(exc, FileNotFoundError):
         return (

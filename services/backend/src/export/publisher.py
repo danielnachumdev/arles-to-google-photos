@@ -18,6 +18,7 @@ from gp_wrapper import (
 from ..progress import ProgressSink, raise_if_cancelled
 from ..utils import batchify
 from .preview import AlbumJournal, AlbumPreview, PreviewItem
+from .publish_media import PublishMediaPreparer
 from .timestamps import CaptureTimestampStamper
 
 PathResolver = Callable[[str], Path]
@@ -50,8 +51,14 @@ class _StamperLike(Protocol):
 class AlbumPublisher:
     """Create a Photos album and attach preview media via gp_wrapper."""
 
-    def __init__(self, stamper: Optional[_StamperLike] = None) -> None:
+    def __init__(
+        self,
+        stamper: Optional[_StamperLike] = None,
+        *,
+        media: Optional[PublishMediaPreparer] = None,
+    ) -> None:
         self._stamper = stamper or CaptureTimestampStamper()
+        self._media = media or PublishMediaPreparer()
 
     def publish(
         self,
@@ -99,7 +106,17 @@ class AlbumPublisher:
             for item in batch_items:
                 raise_if_cancelled(sink)
                 absolute_index = done
-                path = _resolve_media_path(resolve_path, item)
+                try:
+                    path = self._media.prepare(
+                        item, root=root, resolve=_safe_resolve(resolve_path, item)
+                    )
+                except FileNotFoundError:
+                    raise
+                except OSError as exc:
+                    raise OSError(
+                        f"Could not load photo '{item.id}' for Google Photos upload "
+                        f"({item.relpath}): {exc}"
+                    ) from exc
                 prev = self._stamper.stamp_path(
                     path,
                     item,
@@ -112,15 +129,15 @@ class AlbumPublisher:
                 try:
                     token = MediaItem.upload_media(gp, str(path))
                 except Exception as exc:
-                    raise RuntimeError(
-                        f"Google Photos rejected upload of '{item.id}' "
-                        f"({item.relpath}): {exc}"
-                    ) from exc
+                    raise RuntimeError(_format_upload_reject(item, path, exc)) from exc
                 new_items.append(
                     NewMediaItem(item.caption, SimpleMediaItem(token, item.id))
                 )
                 if release is not None:
                     release(item.relpath)
+                    play = (item.play_relpath or "").strip()
+                    if play:
+                        release(play)
                 if sink is not None:
                     sink.emit("publish", item.relpath, current=done, total=total)
             if last_id is None:
@@ -138,29 +155,42 @@ class AlbumPublisher:
 _ADD_TEXT_PART_LIMIT = 1000
 
 
-def _resolve_media_path(resolve_path: PathResolver, item: PreviewItem) -> Path:
-    """Resolve one preview item for upload; raise a clear error if missing."""
-    try:
-        path = resolve_path(item.relpath)
-    except FileNotFoundError as exc:
-        missing = str(exc).strip() or item.relpath
-        raise FileNotFoundError(
-            f"Could not load photo '{item.id}' for Google Photos upload "
-            f"({item.relpath}). File missing from storage"
-            + (f": {missing}" if missing != item.relpath else "")
-            + "."
-        ) from exc
-    except OSError as exc:
-        raise OSError(
-            f"Could not load photo '{item.id}' for Google Photos upload "
-            f"({item.relpath}): {exc}"
-        ) from exc
-    if not path.is_file() or path.stat().st_size <= 0:
-        raise FileNotFoundError(
-            f"Could not load photo '{item.id}' for Google Photos upload "
-            f"({item.relpath}). File missing or empty on the server."
-        )
-    return path
+def _safe_resolve(resolve_path: PathResolver, item: PreviewItem) -> PathResolver:
+    """Wrap resolve so missing source paths keep the existing item-scoped message."""
+
+    def resolve(relpath: str) -> Path:
+        try:
+            path = resolve_path(relpath)
+        except FileNotFoundError as exc:
+            missing = str(exc).strip() or relpath
+            label = item.relpath if relpath == item.relpath else relpath
+            raise FileNotFoundError(
+                f"Could not load photo '{item.id}' for Google Photos upload "
+                f"({label}). File missing from storage"
+                + (f": {missing}" if missing != label else "")
+                + "."
+            ) from exc
+        except OSError as exc:
+            label = item.relpath if relpath == item.relpath else relpath
+            raise OSError(
+                f"Could not load photo '{item.id}' for Google Photos upload "
+                f"({label}): {exc}"
+            ) from exc
+        return path
+
+    return resolve
+
+
+def _format_upload_reject(item: PreviewItem, upload_path: Path, exc: BaseException) -> str:
+    """Human-readable Photos rejection; name source and bytes actually posted."""
+    source = item.relpath
+    if upload_path.name.lower() != Path(source).name.lower():
+        where = f"source {source}; uploaded {upload_path.name}"
+    else:
+        where = source
+    detail = str(exc).strip() or exc.__class__.__name__
+    return f"Google Photos rejected upload of '{item.id}' ({where}): {detail}"
+
 
 
 def _create_album(gp: GooglePhotos, title: str) -> Album:

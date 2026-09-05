@@ -124,6 +124,36 @@ class TestCaptureTimestampStamper(TimestampSuite):
         assert self.mp4_creation_time(companion) == datetime(2012, 8, 2, 0, 0, 0)
         assert abs((self.mtime(wmv) - datetime(2012, 8, 2, 0, 0, 0)).total_seconds()) <= 2
 
+    def test_stamp_wmv_ignores_empty_play_placeholder(self) -> None:
+        """Sparse 0-byte preview/*.mp4 must not become the upload companion."""
+        wmv = self.tmp_path / "hrimages" / "clip01hr.wmv"
+        play = self.tmp_path / "preview" / "clip01.mp4"
+        wmv.parent.mkdir(parents=True, exist_ok=True)
+        play.parent.mkdir(parents=True, exist_ok=True)
+        self.write_wmv(wmv)
+        play.write_bytes(b"")
+
+        self.stamper.stamp_upload(
+            self.tmp_path,
+            [
+                PreviewItem(
+                    id="clip01",
+                    relpath="hrimages/clip01hr.wmv",
+                    caption="",
+                    size_bytes=wmv.stat().st_size,
+                    taken_on=date(2012, 8, 2),
+                    kind="video",
+                    play_relpath="preview/clip01.mp4",
+                ),
+            ],
+        )
+
+        companion = self.tmp_path / "hrimages" / "clip01hr.mp4"
+        assert companion.is_file()
+        assert companion.stat().st_size > 0
+        assert self.mp4_creation_time(companion) == datetime(2012, 8, 2, 0, 0, 0)
+
+
     def test_stamp_wmv_without_play_sidecar_still_builds_upload_mp4(self) -> None:
         """gp_wrapper converts WMV→MP4 at upload; that file must exist with creation_time."""
         wmv = self.tmp_path / "hrimages" / "clip01hr.wmv"

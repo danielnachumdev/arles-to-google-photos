@@ -491,13 +491,27 @@ class TestAlbumPublisher(PublisherSuite):
         assert "0809_2_19_01" in str(caught.value)
         assert "hrimages/0809_2_19_01hr.JPG" in str(caught.value)
 
-    def test_publish_api_reject_includes_item_path(self, tmp_path: Path) -> None:
+    def test_publish_api_reject_includes_source_and_uploaded_mp4(
+        self, tmp_path: Path
+    ) -> None:
         from src.export.publisher import AlbumPublisher
 
-        img = tmp_path / "hrimages" / "0308_1_22hr.wmv"
-        img.parent.mkdir(parents=True, exist_ok=True)
-        img.write_bytes(b"wmv")
-        preview = _preview(_item("0308_1_22", "hrimages/0308_1_22hr.wmv"))
+        wmv = tmp_path / "hrimages" / "0308_1_22hr.wmv"
+        play = tmp_path / "preview" / "0308_1_22.mp4"
+        wmv.parent.mkdir(parents=True, exist_ok=True)
+        play.parent.mkdir(parents=True, exist_ok=True)
+        wmv.write_bytes(b"wmv")
+        play.write_bytes(b"ftyp-real")
+        preview = _preview(
+            PreviewItem(
+                id="0308_1_22",
+                relpath="hrimages/0308_1_22hr.wmv",
+                caption="",
+                size_bytes=3,
+                kind="video",
+                play_relpath="preview/0308_1_22.mp4",
+            )
+        )
         gp = MagicMock()
         album = MagicMock()
         album.id = "album-x"
@@ -511,6 +525,58 @@ class TestAlbumPublisher(PublisherSuite):
             )
             with pytest.raises(RuntimeError, match="Google Photos rejected upload") as caught:
                 AlbumPublisher().publish(gp, tmp_path, preview)
-        assert "0308_1_22" in str(caught.value)
-        assert "0308_1_22hr.wmv" in str(caught.value)
+        message = str(caught.value)
+        assert "0308_1_22" in message
+        assert "0308_1_22hr.wmv" in message
+        assert "uploaded 0308_1_22hr.mp4" in message
+        uploaded_path = Path(MediaItem.upload_media.call_args.args[1])
+        assert uploaded_path.suffix.lower() == ".mp4"
+        assert uploaded_path.stat().st_size > 0
+
+    def test_publish_wmv_with_empty_play_placeholder_uploads_hydrated_mp4(
+        self, tmp_path: Path
+    ) -> None:
+        from src.export.publish_media import PublishMediaPreparer
+        from src.export.publisher import AlbumPublisher
+
+        wmv = tmp_path / "hrimages" / "clip01hr.wmv"
+        play = tmp_path / "preview" / "clip01.mp4"
+        wmv.parent.mkdir(parents=True)
+        play.parent.mkdir(parents=True)
+        wmv.write_bytes(b"wmv-bytes")
+        play.write_bytes(b"")  # sparse placeholder
+        durable = b"ftyp-hydrated"
+
+        def resolve(rel: str) -> Path:
+            path = tmp_path / rel
+            if rel == "preview/clip01.mp4":
+                path.write_bytes(durable)
+            return path
+
+        preview = _preview(
+            PreviewItem(
+                id="clip01",
+                relpath="hrimages/clip01hr.wmv",
+                caption="",
+                size_bytes=9,
+                kind="video",
+                play_relpath="preview/clip01.mp4",
+            )
+        )
+        gp = MagicMock()
+        album = MagicMock()
+        album.id = "album-wmv"
+        with patch("src.export.publisher.Album") as AlbumCls, patch(
+            "src.export.publisher.MediaItem"
+        ) as MediaItem:
+            AlbumCls.create.return_value = album
+            MediaItem.upload_media.return_value = "tok-mp4"
+            MediaItem.batchCreate.return_value = []
+            AlbumPublisher(media=PublishMediaPreparer()).publish(
+                gp, tmp_path, preview, resolve=resolve
+            )
+        uploaded = Path(MediaItem.upload_media.call_args.args[1])
+        assert uploaded.name == "clip01hr.mp4"
+        assert uploaded.read_bytes() == durable
+
 

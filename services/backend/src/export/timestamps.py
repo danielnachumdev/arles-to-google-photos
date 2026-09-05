@@ -203,15 +203,22 @@ class CaptureTimestampStamper:
         companion = path.with_suffix(".mp4")
         if companion.is_file() and companion.stat().st_size > 0:
             return companion
+        if companion.is_file() and companion.stat().st_size <= 0:
+            try:
+                companion.unlink()
+            except OSError:
+                pass
         play = item.play_relpath
         if play:
             play_path = root / play
-            if play_path.is_file():
+            # Sparse GCS placeholders are 0-byte files — never copy those.
+            if play_path.is_file() and play_path.stat().st_size > 0:
                 try:
                     shutil.copy2(play_path, companion)
                 except OSError:
                     return None
-                return companion
+                if companion.is_file() and companion.stat().st_size > 0:
+                    return companion
         if self._transcode_to_mp4(path, companion):
             return companion
         return None
