@@ -81,6 +81,59 @@ class TestLocalVideoPreviews(VideoPreviewSuite):
             "job-1", "preview/clip01.mp4", mp4
         )
 
+    def test_ensure_skips_zero_byte_gcs_placeholders(self) -> None:
+        self.hr.mkdir()
+        (self.hr / "clip01hr.wmv").write_bytes(b"")
+        calls: list[str] = []
+
+        def boom(src: Path, dest: Path) -> bool:
+            del src, dest
+            calls.append("called")
+            return False
+
+        created = ensure_local_video_previews(
+            self.tmp_path, transcode=boom, extract_frame=boom
+        )
+        assert created == ()
+        assert calls == []
+
+    def test_hydrate_video_sources_downloads_placeholders(self) -> None:
+        from src.export.video_preview import hydrate_video_sources
+
+        self.hr.mkdir()
+        stub = self.hr / "clip01hr.wmv"
+        stub.write_bytes(b"")
+        downloaded: list[str] = []
+
+        def ensure_file(rel: str) -> Path:
+            downloaded.append(rel)
+            path = self.tmp_path / rel
+            path.write_bytes(b"real-wmv-bytes")
+            return path
+
+        hydrate_video_sources(self.tmp_path, ensure_file)
+        assert downloaded == ["hrimages/clip01hr.wmv"]
+        assert stub.read_bytes() == b"real-wmv-bytes"
+
+    def test_hydrate_rehydrates_empty_preview_mp4(self) -> None:
+        from src.export.video_preview import hydrate_video_sources
+
+        preview = self.tmp_path / "preview"
+        preview.mkdir()
+        stub = preview / "clip01.mp4"
+        stub.write_bytes(b"")
+        downloaded: list[str] = []
+
+        def ensure_file(rel: str) -> Path:
+            downloaded.append(rel)
+            path = self.tmp_path / rel
+            path.write_bytes(b"ftyp-real")
+            return path
+
+        hydrate_video_sources(self.tmp_path, ensure_file)
+        assert downloaded == ["preview/clip01.mp4"]
+        assert stub.read_bytes() == b"ftyp-real"
+
     def test_ensure_local_video_previews_ignores_transcode_failure(self) -> None:
         self.hr.mkdir()
         (self.hr / "clip01hr.wmv").write_bytes(b"WMV-bytes")
@@ -136,16 +189,18 @@ class TestLocalVideoPreviews(VideoPreviewSuite):
         )
         assert "called" not in calls
 
-    def test_transcode_and_extract_moviepy_paths(
+    def test_transcode_and_extract_moviepy_fallback(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         import sys
         import types
 
+        from src.export import video_preview
         from src.export.video_preview import extract_poster_frame, transcode_to_mp4
 
         source = self.tmp_path / "in.wmv"
         source.write_bytes(b"wmv")
+        monkeypatch.setattr(video_preview, "_ffmpeg_exe", lambda: None)
 
         class FakeClip:
             def write_videofile(
@@ -174,13 +229,38 @@ class TestLocalVideoPreviews(VideoPreviewSuite):
         assert extract_poster_frame(source, dest_jpg) is True
         assert dest_jpg.read_bytes().startswith(b"\xff\xd8")
 
-    def test_transcode_returns_false_when_moviepy_missing(
+    def test_transcode_uses_ffmpeg_when_available(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from src.export import video_preview
+        from src.export.video_preview import transcode_to_mp4
+
+        source = self.tmp_path / "in.wmv"
+        source.write_bytes(b"wmv")
+        dest = self.tmp_path / "out.mp4"
+        monkeypatch.setattr(video_preview, "_ffmpeg_exe", lambda: "ffmpeg")
+
+        def fake_run(args: list[str], check: bool = False, capture_output: bool = False):
+            del check, capture_output
+            out = Path(args[-1])
+            out.write_bytes(b"ftyp-from-ffmpeg")
+            return types.SimpleNamespace(returncode=0)
+
+        import types
+
+        monkeypatch.setattr(video_preview.subprocess, "run", fake_run)
+        assert transcode_to_mp4(source, dest) is True
+        assert dest.read_bytes() == b"ftyp-from-ffmpeg"
+
+    def test_transcode_returns_false_when_encoders_missing(
         self, monkeypatch: pytest.MonkeyPatch
     ) -> None:
         import builtins
 
+        from src.export import video_preview
         from src.export.video_preview import extract_poster_frame, transcode_to_mp4
 
+        monkeypatch.setattr(video_preview, "_ffmpeg_exe", lambda: None)
         real_import = builtins.__import__
 
         def fake_import(name: str, *args: object, **kwargs: object):

@@ -1,6 +1,8 @@
 """Local poster + browser-playable mp4 copies for video preview items."""
 from __future__ import annotations
 
+import subprocess
+import tempfile
 from pathlib import Path
 from typing import Callable, Optional, Protocol, Sequence, Tuple
 
@@ -13,6 +15,10 @@ from .media_kinds import (
 
 TranscodeFn = Callable[[Path, Path], bool]
 ExtractFrameFn = Callable[[Path, Path], bool]
+EnsureFileFn = Callable[[str], Path]
+
+# Folders that may hold gallery source videos (not generated preview/).
+_SOURCE_VIDEO_DIRS = ("hrimages", "images", "imagepages")
 
 
 class _AlbumFileStore(Protocol):
@@ -26,8 +32,120 @@ class _AlbumFileStore(Protocol):
         ...
 
 
+def _ffmpeg_exe() -> Optional[str]:
+    try:
+        import imageio_ffmpeg
+    except ImportError:
+        return None
+    try:
+        return imageio_ffmpeg.get_ffmpeg_exe()
+    except Exception:
+        return None
+
+
 def transcode_to_mp4(source: Path, dest: Path) -> bool:
     """Write ``dest`` as mp4. Returns False on failure (never raises)."""
+    if _transcode_with_ffmpeg(source, dest):
+        return True
+    return _transcode_with_moviepy(source, dest)
+
+
+def extract_poster_frame(source: Path, dest: Path) -> bool:
+    """Save the first frame of ``source`` as JPEG. Returns False on failure."""
+    if _extract_frame_with_ffmpeg(source, dest):
+        return True
+    return _extract_frame_with_moviepy(source, dest)
+
+
+def _transcode_with_ffmpeg(source: Path, dest: Path) -> bool:
+    ffmpeg = _ffmpeg_exe()
+    if not ffmpeg:
+        return False
+    dest = Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp_path: Optional[Path] = None
+    try:
+        with tempfile.NamedTemporaryFile(
+            prefix=f".{dest.stem}_xcode_",
+            suffix=".mp4",
+            dir=str(dest.parent),
+            delete=False,
+        ) as handle:
+            tmp_path = Path(handle.name)
+        # Remux first (MOV→MP4); re-encode for WMV / incompatible codecs.
+        for args in (
+            [
+                ffmpeg,
+                "-y",
+                "-i",
+                str(source),
+                "-c",
+                "copy",
+                "-movflags",
+                "+faststart",
+                str(tmp_path),
+            ],
+            [
+                ffmpeg,
+                "-y",
+                "-i",
+                str(source),
+                "-c:v",
+                "libx264",
+                "-pix_fmt",
+                "yuv420p",
+                "-c:a",
+                "aac",
+                "-movflags",
+                "+faststart",
+                str(tmp_path),
+            ],
+        ):
+            result = subprocess.run(args, check=False, capture_output=True)
+            if (
+                result.returncode == 0
+                and tmp_path.is_file()
+                and tmp_path.stat().st_size > 0
+            ):
+                tmp_path.replace(dest)
+                return True
+        if tmp_path is not None:
+            tmp_path.unlink(missing_ok=True)
+        return False
+    except Exception:
+        if tmp_path is not None:
+            tmp_path.unlink(missing_ok=True)
+        return False
+
+
+def _extract_frame_with_ffmpeg(source: Path, dest: Path) -> bool:
+    ffmpeg = _ffmpeg_exe()
+    if not ffmpeg:
+        return False
+    dest = Path(dest)
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        result = subprocess.run(
+            [
+                ffmpeg,
+                "-y",
+                "-i",
+                str(source),
+                "-ss",
+                "0",
+                "-vframes",
+                "1",
+                str(dest),
+            ],
+            check=False,
+            capture_output=True,
+        )
+        return result.returncode == 0 and dest.is_file() and dest.stat().st_size > 0
+    except Exception:
+        return False
+
+
+def _transcode_with_moviepy(source: Path, dest: Path) -> bool:
     try:
         import moviepy.editor as moviepy  # type: ignore[import-untyped]
     except Exception:
@@ -47,8 +165,7 @@ def transcode_to_mp4(source: Path, dest: Path) -> bool:
         return False
 
 
-def extract_poster_frame(source: Path, dest: Path) -> bool:
-    """Save the first frame of ``source`` as JPEG. Returns False on failure."""
+def _extract_frame_with_moviepy(source: Path, dest: Path) -> bool:
     try:
         import moviepy.editor as moviepy  # type: ignore[import-untyped]
     except Exception:
@@ -68,6 +185,50 @@ def extract_poster_frame(source: Path, dest: Path) -> bool:
         return False
 
 
+def iter_video_source_relpaths(root: Path) -> Tuple[str, ...]:
+    """Album-relative paths of source videos that may need preview sidecars."""
+    root = Path(root)
+    found: list[str] = []
+    for folder_name in _SOURCE_VIDEO_DIRS:
+        folder = root / folder_name
+        if not folder.is_dir():
+            continue
+        for path in folder.iterdir():
+            if not path.is_file() or not is_video_filename(path.name):
+                continue
+            found.append(path.relative_to(root).as_posix())
+    return tuple(found)
+
+
+def hydrate_video_sources(root: Path, ensure_file: EnsureFileFn) -> None:
+    """Download real video bytes for sparse/GCS placeholders before transcode.
+
+    Cloud Run keeps empty media placeholders until ``ensure_file``; moviepy/ffmpeg
+    cannot build ``preview/*.mp4`` from zero-byte WMV stubs. Also re-hydrates
+    existing ``preview/*.mp4`` sidecars so reprocess does not re-encode needlessly.
+    """
+    for rel in iter_video_source_relpaths(root):
+        try:
+            ensure_file(rel)
+        except Exception:
+            # Missing object or network blip — skip; ensure_local will ignore empty.
+            pass
+    preview_dir = Path(root) / "preview"
+    if not preview_dir.is_dir():
+        return
+    for path in preview_dir.iterdir():
+        if not path.is_file():
+            continue
+        if path.suffix.lower() not in BROWSER_PLAYABLE_VIDEO:
+            continue
+        if path.stat().st_size > 0:
+            continue
+        try:
+            ensure_file(path.relative_to(root).as_posix())
+        except Exception:
+            pass
+
+
 def ensure_local_video_previews(
     root: Path,
     *,
@@ -77,17 +238,16 @@ def ensure_local_video_previews(
     """Create missing ``thumbnails/TN_{id}.jpg`` and ``preview/{id}.mp4`` sidecars.
 
     Returns album-relative paths created this call. Failures are ignored so
-    folder import / scrape can still finish.
+    folder import / scrape can still finish. Zero-byte sources (GCS placeholders)
+    are skipped — call :func:`hydrate_video_sources` first on cloud backends.
     """
     root = Path(root)
-    hr_dir = root / "hrimages"
-    if not hr_dir.is_dir():
-        return ()
     transcode_fn = transcode or transcode_to_mp4
     extract_fn = extract_frame or extract_poster_frame
     created: list[str] = []
-    for path in list(hr_dir.iterdir()):
-        if not path.is_file() or not is_video_filename(path.name):
+    for rel in iter_video_source_relpaths(root):
+        path = root / rel
+        if not path.is_file() or path.stat().st_size <= 0:
             continue
         item_id = id_from_hr_stem(path.stem)
         if not _has_image_sidecar(root, item_id):
@@ -154,6 +314,8 @@ def _thumb_stem_id(stem: str) -> str:
 __all__ = [
     "ensure_local_video_previews",
     "extract_poster_frame",
+    "hydrate_video_sources",
+    "iter_video_source_relpaths",
     "persist_video_preview_sidecars",
     "transcode_to_mp4",
 ]

@@ -15,6 +15,7 @@ from ..export.parser import (
 from ..export.preview import AlbumPreview
 from ..export.video_preview import (
     ensure_local_video_previews,
+    hydrate_video_sources,
     persist_video_preview_sidecars,
 )
 from ..progress import JobCancelled
@@ -541,6 +542,10 @@ class IngestService:
         overwrite: bool,
         overwrite_files: Iterable[tuple[str, bytes, Optional[float]]],
     ) -> str:
+        hydrate_video_sources(
+            job.root,
+            lambda rel: self._store.ensure_artifact_file(job.id, rel),
+        )
         created = ensure_local_video_previews(job.root) or ()
         persist_video_preview_sidecars(self._store, job.id, job.root, created)
         preview = self._parser.parse(

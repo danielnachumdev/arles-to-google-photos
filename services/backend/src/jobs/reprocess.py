@@ -9,6 +9,7 @@ from ..export.parser import STRUCTURE_FALLBACK_WARNING
 from ..export.preview import AlbumPreview
 from ..export.video_preview import (
     ensure_local_video_previews,
+    hydrate_video_sources,
     persist_video_preview_sidecars,
 )
 from ..progress import JobCancelled
@@ -267,6 +268,10 @@ class ReprocessService:
                 total=0,
             )
             album_root = self._store.ensure_local_root(job.id)
+            hydrate_video_sources(
+                album_root,
+                lambda rel: self._store.ensure_artifact_file(job.id, rel),
+            )
             created = ensure_local_video_previews(album_root) or ()
             persist_video_preview_sidecars(
                 self._store, job.id, album_root, created
