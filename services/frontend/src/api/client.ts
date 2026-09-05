@@ -116,7 +116,9 @@ export class MigrationClient {
     const query = params.toString() ? `?${params.toString()}` : ''
     const { status, bodyText } = await postFormData(`${this.baseUrl}/jobs${query}`, form, {
       onProgress: options?.onUploadProgress,
-      // Durable store runs in a background job; do not block the XHR on NDJSON store lines.
+      onStoreProgress: options?.onStoreProgress,
+      // Cloud may stream durable-put progress after the browser upload hits 100%.
+      streamStoreProgress: Boolean(options?.onStoreProgress),
     })
 
     if (status === 409) {

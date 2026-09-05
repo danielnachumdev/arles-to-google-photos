@@ -1,9 +1,9 @@
-"""Streaming multipart album ingress: stage locally, durable store in background.
+"""Streaming multipart album ingress into ArtifactStore.
 
-Avoids blocking the HTTP request on GCS uploads. Each part is copied to a temp
-file, staged onto the job's local tree, then discarded. An orchestrator job
-flushes staged files to durable storage (with SSE progress) and runs preview
-prepare.
+Cloud Run local disk counts toward memory, so cloud backends durable-put each
+part during the request (one file at a time, then discard). Filesystem backends
+stage locally and enqueue preview prepare only. Preview parse always runs via
+``submit(finish_prepared)`` after the HTTP response can return.
 """
 from __future__ import annotations
 
@@ -18,7 +18,6 @@ from typing import (
     Dict,
     Iterable,
     Iterator,
-    List,
     Optional,
     Protocol,
     Sequence,
@@ -75,9 +74,6 @@ class _StoreLike(Protocol):
     ) -> None:
         ...
 
-    def staged_album_root(self, job_id: str) -> Path:
-        ...
-
     def retains_full_local_tree(self) -> bool:
         ...
 
@@ -109,7 +105,7 @@ def peek_gallery_title_from_parts(
 
 
 class MultipartAlbumIngress:
-    """Multipart → local stage → enqueue durable store + parse."""
+    """Multipart → durable artifacts (memory-safe on cloud) → enqueue parse."""
 
     def __init__(
         self,
@@ -156,9 +152,14 @@ class MultipartAlbumIngress:
         access_token: Optional[str] = None,
         owner_id: Optional[str] = None,
     ) -> Iterator[Dict[str, Any]]:
-        """Stage parts locally, enqueue background store+prepare, yield complete.
+        """Accept parts, yield optional store progress, enqueue preview prepare.
 
-        Durable GCS put and preview parse run via ``submit(store_and_prepare)``.
+        Cloud (GCS): each part is uploaded to durable storage during the request
+        so the container never holds a full album tree (Cloud Run OOM).
+
+        Local FS: parts are staged on disk; durable store is already local.
+
+        Preview parse always runs in the background via ``submit``.
         """
         title = peek_gallery_title_from_parts(parts)
         job_id = self._ingest.start(
@@ -170,52 +171,31 @@ class MultipartAlbumIngress:
             owner_id=owner_id,
             title=title,
         )
+        total = len(parts)
+        cloud = not self._store.retains_full_local_tree()
         try:
-            for part in parts:
-                self._stage_part(job_id, part)
+            for index, part in enumerate(parts, start=1):
+                self._accept_part(job_id, part, durable=cloud)
+                if cloud:
+                    self._emit_store_progress(job_id, index, total)
+                    yield {
+                        "event": "store",
+                        "job_id": job_id,
+                        "current": index,
+                        "total": total,
+                        "message": STORE_MESSAGE,
+                    }
         except Exception:
             raise
 
         overwrite_flag = overwrite
         self._submit(
             job_id,
-            lambda: self.store_and_prepare(job_id, overwrite=overwrite_flag),
+            lambda: self._ingest.finish_prepared(
+                job_id, overwrite=overwrite_flag
+            ),
         )
         yield {"event": "complete", "job_id": job_id}
-
-    def store_and_prepare(self, job_id: str, *, overwrite: bool = False) -> str:
-        """Flush staged files to durable storage, then parse preview."""
-        self._flush_staged(job_id)
-        return self._ingest.finish_prepared(job_id, overwrite=overwrite)
-
-    def _flush_staged(self, job_id: str) -> None:
-        if self._store.retains_full_local_tree():
-            # Filesystem backend: stage already wrote durable local files.
-            return
-        root = self._store.staged_album_root(job_id)
-        skip_names = {
-            "job.json",
-            "events.json",
-            "job.json.tmp",
-            "events.json.tmp",
-            "arles-media-index.json",
-        }
-        rels: List[str] = []
-        if root.is_dir():
-            for path in root.rglob("*"):
-                if not path.is_file() or path.name in skip_names:
-                    continue
-                if path.stat().st_size <= 0:
-                    continue
-                rels.append(path.relative_to(root).as_posix())
-        total = len(rels)
-        for index, rel in enumerate(rels, start=1):
-            path = root / rel
-            if not path.is_file() or path.stat().st_size <= 0:
-                continue
-            mtime = path.stat().st_mtime
-            self._store.put_album_file(job_id, rel, path, mtime=mtime)
-            self._emit_store_progress(job_id, index, total)
 
     def _emit_store_progress(self, job_id: str, current: int, total: int) -> None:
         if self._emit is None:
@@ -228,7 +208,9 @@ class MultipartAlbumIngress:
             total=total,
         )
 
-    def _stage_part(self, job_id: str, part: AlbumUploadPart) -> None:
+    def _accept_part(
+        self, job_id: str, part: AlbumUploadPart, *, durable: bool
+    ) -> None:
         fd, name = tempfile.mkstemp(prefix="arles-part-", dir=str(self._jobs_root))
         path = Path(name)
         try:
@@ -242,8 +224,14 @@ class MultipartAlbumIngress:
                     out.write(chunk)
             if part.mtime is not None:
                 os.utime(path, (part.mtime, part.mtime))
-            self._store.stage_album_file(
-                job_id, part.relpath, path, mtime=part.mtime
-            )
+            if durable:
+                # GCS: upload immediately, then discard local bytes (placeholder).
+                self._store.put_album_file(
+                    job_id, part.relpath, path, mtime=part.mtime
+                )
+            else:
+                self._store.stage_album_file(
+                    job_id, part.relpath, path, mtime=part.mtime
+                )
         finally:
             path.unlink(missing_ok=True)

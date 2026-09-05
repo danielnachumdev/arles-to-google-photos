@@ -461,6 +461,14 @@ export function AlbumWorkbench({
               : t.sendingFiles(payload.length),
           )
         },
+        onStoreProgress: (event) => {
+          setUploadProgress({ phase: 'store', ...event })
+          setStatusLine(
+            event.total > 0
+              ? t.storingFilesProgress(event.current, event.total, event.percent)
+              : t.storingFiles,
+          )
+        },
       })
       setUploadProgress(null)
       announceRunSubmitted(created.id, created.number)
