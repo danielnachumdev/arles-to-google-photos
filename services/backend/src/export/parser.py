@@ -607,10 +607,9 @@ class AlbumExportParser:
                 if _looks_like_image_viewer(index_soup):
                     caption = self._imagetitle_text(index_soup) or ""
         kind = infer_item_kind(relpath)
-        thumb_relpath = None
+        thumb_relpath = _find_thumb_relpath(root, item_id)
         play_relpath = None
         if kind == KIND_VIDEO:
-            thumb_relpath = _find_thumb_relpath(root, item_id)
             play_relpath = _find_play_relpath(root, item_id, relpath)
         size_bytes = int(stat.st_size)
         mtime = float(stat.st_mtime)
@@ -710,31 +709,11 @@ def _hr_file_rank(path: Path) -> Tuple[int, int]:
     return (video_rank, hr_rank)
 
 
-def _thumb_stem_id(stem: str) -> str:
-    if len(stem) > 3 and stem[:3].casefold() == "tn_":
-        return stem[3:]
-    return stem
-
-
 def _find_thumb_relpath(root: Path, item_id: str) -> Optional[str]:
-    key = item_id.casefold()
-    searches = (
-        (root / "thumbnails", _thumb_stem_id),
-        (root / "preview", lambda stem: stem),
-        (root / "hrimages", _id_from_hr_stem),
-    )
-    for folder, stem_id in searches:
-        if not folder.is_dir():
-            continue
-        for path in folder.iterdir():
-            if not path.is_file():
-                continue
-            if path.suffix.lower() not in IMAGE_EXTENSIONS:
-                continue
-            if stem_id(path.stem).casefold() != key:
-                continue
-            return path.relative_to(root).as_posix()
-    return None
+    """Prefer Arles ``thumbnails/`` / ``preview/`` stills — never ``hrimages/``."""
+    from .thumbnail import ThumbnailCatalog
+
+    return ThumbnailCatalog().resolve(root, item_id)
 
 
 def _find_play_relpath(root: Path, item_id: str, relpath: str) -> Optional[str]:

@@ -959,7 +959,7 @@ export function AlbumWorkbench({
                     ? item.thumb_relpath
                       ? client.mediaUrl(job.id, item.id, 'thumb')
                       : ''
-                    : client.mediaUrl(job.id, item.id)
+                    : client.mediaUrl(job.id, item.id, 'thumb')
                 return (
                 <PreviewCard
                   key={item.id}
@@ -977,13 +977,15 @@ export function AlbumWorkbench({
                       src:
                         kind === 'video'
                           ? client.mediaUrl(job.id, item.id, 'play')
-                          : client.mediaUrl(job.id, item.id),
+                          : client.mediaUrl(job.id, item.id, 'original'),
                       caption: captions[item.id] ?? item.caption,
                       kind,
                       relpath: item.relpath,
                       poster: item.thumb_relpath
                         ? client.mediaUrl(job.id, item.id, 'thumb')
-                        : null,
+                        : kind === 'video'
+                          ? null
+                          : client.mediaUrl(job.id, item.id, 'thumb'),
                     })
                   }
                 />

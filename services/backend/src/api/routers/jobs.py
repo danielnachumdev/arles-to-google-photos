@@ -293,6 +293,21 @@ def get_media(
     for item in preview.items:
         if item.id != item_id:
             continue
+        if chosen == "thumb":
+            from ...export.thumbnail import ThumbnailRenderer
+
+            try:
+                path = ThumbnailRenderer(deps.store).ensure_thumb(
+                    job_id,
+                    item_id=item.id,
+                    original_relpath=item.relpath,
+                    thumb_relpath=item.thumb_relpath,
+                )
+            except FileNotFoundError as exc:
+                raise HTTPException(status_code=404, detail="media missing") from exc
+            if not path.is_file():
+                raise HTTPException(status_code=404, detail="media missing")
+            return FileResponse(path, media_type="image/jpeg")
         relpath = _media_relpath(item, chosen)
         if relpath is None:
             raise HTTPException(status_code=404, detail="media missing")
@@ -311,11 +326,8 @@ def _media_relpath(item: PreviewItem, variant: str) -> Optional[str]:
         return item.relpath
     kind = infer_item_kind(item.relpath, item.kind)
     if variant == "thumb":
-        if item.thumb_relpath:
-            return item.thumb_relpath
-        if kind == KIND_IMAGE:
-            return item.relpath
-        return None
+        # Thumbnails are resolved via ThumbnailRenderer (never fall back to HR).
+        return item.thumb_relpath
     if item.play_relpath:
         return item.play_relpath
     if kind == KIND_IMAGE:

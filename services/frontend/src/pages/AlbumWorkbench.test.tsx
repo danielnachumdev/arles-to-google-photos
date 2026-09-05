@@ -962,6 +962,38 @@ describe('AlbumWorkbench publish sign-in', () => {
     expect(video).toHaveAttribute('aria-label', t.videoPreviewAria(videoItem.id))
   })
 
+  it('uses thumb URLs in the grid and original in the image lightbox', async () => {
+    const imageItem = PreviewItemBuilder.jpeg().build()
+    const imageJob = JobBuilder.preview({
+      preview: {
+        ...PREVIEW_JOB.preview!,
+        items: [imageItem],
+      },
+    }).build()
+    fetchMock.mockImplementation(async (input: RequestInfo | URL) => {
+      if (String(input).endsWith(`/api/jobs/${imageJob.id}`)) {
+        return jsonResponse(imageJob)
+      }
+      return jsonResponse({ detail: 'not found' }, 404)
+    })
+    harness.renderWorkbench()
+
+    const open = await screen.findByRole('button', {
+      name: t.openPreviewAria(imageItem.id),
+    })
+    const card = open.closest('.preview-card')
+    expect(card?.querySelector('img.preview-card__thumb')).toHaveAttribute(
+      'src',
+      `/api/jobs/${imageJob.id}/media/${imageItem.id}?variant=thumb`,
+    )
+    fireEvent.click(open)
+    const lightboxImg = document.querySelector('.image-preview-modal img')
+    expect(lightboxImg).toHaveAttribute(
+      'src',
+      `/api/jobs/${imageJob.id}/media/${imageItem.id}`,
+    )
+  })
+
   it('marks the gallery description dirty and saves edits', async () => {
     fetchMock.mockImplementation(async (input: RequestInfo | URL, init?: RequestInit) => {
       const url = String(input)

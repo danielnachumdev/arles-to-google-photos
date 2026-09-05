@@ -18,7 +18,7 @@ from tests.support.suites import TmpPathSuite
 
 
 class TestMediaVariantEdges(ApiClientSuite):
-    def test_image_play_and_thumb_use_original(self) -> None:
+    def test_image_play_uses_original_thumb_is_low_res(self) -> None:
         api = self.make_api()
         job = api.ingest()
         job_id = job["id"]
@@ -29,7 +29,8 @@ class TestMediaVariantEdges(ApiClientSuite):
         assert play.status_code == 200
         assert thumb.status_code == 200
         assert play.content == original.content
-        assert thumb.content == original.content
+        assert thumb.content.startswith(b"\xff\xd8")
+        assert len(thumb.content) < len(original.content)
 
     def test_missing_item_and_missing_file_are_404(self) -> None:
         api = self.make_api()

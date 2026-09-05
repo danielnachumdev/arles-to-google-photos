@@ -74,7 +74,7 @@ export function PreviewCard({
       >
         <span className="preview-card__thumb-wrap">
           {thumbUrl ? (
-            <img className="preview-card__thumb" src={thumbUrl} alt="" width={160} />
+            <img className="preview-card__thumb" src={thumbUrl} alt="" width={160} loading="lazy" />
           ) : (
             <span className="preview-card__video-placeholder" aria-hidden="true" />
           )}

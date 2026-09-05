@@ -367,7 +367,8 @@ class TestAlbumExportParser(ParserSuite):
         item = preview.items[0]
         assert item.relpath == "hrimages/clip01hr.wmv"
         assert item.kind == "video"
-        assert item.thumb_relpath == "hrimages/clip01hr.jpg"
+        # Companion stills under hrimages/ are never used as grid thumbs.
+        assert item.thumb_relpath is None
         assert item.play_relpath is None
 
     def test_item_id_strips_trailing_hr_only(self, tmp_path: Path) -> None:
