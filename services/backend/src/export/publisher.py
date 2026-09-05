@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import List, Optional, Protocol, Sequence
+from typing import Callable, List, Optional, Protocol, Sequence
 
 from gp_wrapper import (
     MEDIA_ITEM_BATCH_CREATE_MAXIMUM_IDS,
@@ -20,9 +20,30 @@ from ..utils import batchify
 from .preview import AlbumJournal, AlbumPreview, PreviewItem
 from .timestamps import CaptureTimestampStamper
 
+PathResolver = Callable[[str], Path]
+PathReleaser = Callable[[str], None]
+
 
 class _StamperLike(Protocol):
-    def stamp_upload(self, root: Path, items: Sequence[PreviewItem]) -> None:
+    def album_day_for(
+        self,
+        root: Path,
+        items: Sequence[PreviewItem],
+        *,
+        resolve: Optional[PathResolver] = None,
+    ) -> Optional[object]:
+        ...
+
+    def stamp_path(
+        self,
+        path: Path,
+        item: PreviewItem,
+        *,
+        index: int,
+        prev: Optional[object],
+        album_day: Optional[object],
+        root: Path,
+    ) -> Optional[object]:
         ...
 
 
@@ -38,11 +59,14 @@ class AlbumPublisher:
         root: Path,
         preview: AlbumPreview,
         sink: Optional[ProgressSink] = None,
+        *,
+        resolve: Optional[PathResolver] = None,
+        release: Optional[PathReleaser] = None,
     ) -> Album:
         root = Path(root)
+        resolve_path = resolve or (lambda rel: root / rel)
         to_upload = list(preview.items)
         total = len(to_upload)
-        self._stamper.stamp_upload(root, to_upload)
         if sink is not None:
             sink.emit("publish", "Creating album", current=0, total=max(total, 1))
 
@@ -64,8 +88,9 @@ class AlbumPublisher:
                 relative_position=PositionType.FIRST_IN_ALBUM,
             )
 
-        # Upload + batchCreate per batch so an interrupt mid-album does not leave
-        # an empty Photos album (tokens alone are not attached until batchCreate).
+        # Prefer taken_on from preview ids; do not resolve media just to sniff EXIF.
+        album_day = self._stamper.album_day_for(root, to_upload)
+        prev = None
         last_id: Optional[str] = None
         done = 0
         for batch_items in batchify(to_upload, MEDIA_ITEM_BATCH_CREATE_MAXIMUM_IDS):
@@ -73,15 +98,25 @@ class AlbumPublisher:
             new_items: List[NewMediaItem] = []
             for item in batch_items:
                 raise_if_cancelled(sink)
-                path = root / item.relpath
+                absolute_index = done
+                path = resolve_path(item.relpath)
+                prev = self._stamper.stamp_path(
+                    path,
+                    item,
+                    index=absolute_index,
+                    prev=prev,
+                    album_day=album_day,
+                    root=root,
+                )
                 done += 1
                 token = MediaItem.upload_media(gp, str(path))
                 new_items.append(
                     NewMediaItem(item.caption, SimpleMediaItem(token, item.id))
                 )
+                if release is not None:
+                    release(item.relpath)
                 if sink is not None:
                     sink.emit("publish", item.relpath, current=done, total=total)
-
             if last_id is None:
                 position = AlbumPosition(PositionType.LAST_IN_ALBUM)
             else:

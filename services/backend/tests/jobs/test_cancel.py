@@ -401,6 +401,7 @@ class TestCancel(JobStoreSuite):
                 root: Path,
                 preview: AlbumPreview,
                 sink: Any = None,
+                **_kwargs: Any,
             ) -> Any:
                 started.set()
                 while not hold.wait(timeout=0.05):

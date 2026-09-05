@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 from datetime import date, datetime, time, timedelta
 from pathlib import Path
-from typing import Optional, Sequence
+from typing import Callable, Optional, Sequence
 
 import piexif
 from gp_wrapper.utils import FileTime, FileTimeService
@@ -25,12 +25,19 @@ class CaptureTimestampStamper:
     def __init__(self, times: Optional[FileTimeService] = None) -> None:
         self._times = times or FileTimeService()
 
-    def stamp_upload(self, root: Path, items: Sequence[PreviewItem]) -> None:
+    def stamp_upload(
+        self,
+        root: Path,
+        items: Sequence[PreviewItem],
+        *,
+        resolve: Optional[Callable[[str], Path]] = None,
+    ) -> None:
         prev: Optional[datetime] = None
         root = Path(root)
-        album_day = self._album_day(root, items)
+        resolve_path = resolve or (lambda rel: root / Path(rel))
+        album_day = self._album_day(root, items, resolve=resolve_path)
         for index, item in enumerate(items):
-            path = root / item.relpath
+            path = resolve_path(item.relpath)
             if not path.is_file():
                 continue
             stamp = self._resolve_stamp(path, item.taken_on, index, prev, album_day)
@@ -39,17 +46,50 @@ class CaptureTimestampStamper:
             self._write(path, stamp, root=root, item=item)
             prev = stamp
 
+    def stamp_path(
+        self,
+        path: Path,
+        item: PreviewItem,
+        *,
+        index: int,
+        prev: Optional[datetime],
+        album_day: Optional[date],
+        root: Path,
+    ) -> Optional[datetime]:
+        """Stamp one media file; returns the stamp used (for ordering)."""
+        path = Path(path)
+        if not path.is_file():
+            return prev
+        stamp = self._resolve_stamp(path, item.taken_on, index, prev, album_day)
+        if stamp is None:
+            return prev
+        self._write(path, stamp, root=root, item=item)
+        return stamp
+
+    def album_day_for(
+        self,
+        root: Path,
+        items: Sequence[PreviewItem],
+        *,
+        resolve: Optional[Callable[[str], Path]] = None,
+    ) -> Optional[date]:
+        resolve_path = resolve or (lambda rel: Path(root) / rel)
+        return self._album_day(root, items, resolve=resolve_path)
+
     def _album_day(
         self,
         root: Path,
         items: Sequence[PreviewItem],
+        *,
+        resolve: Optional[Callable[[str], Path]] = None,
     ) -> Optional[date]:
+        resolve_path = resolve or (lambda rel: Path(root) / rel)
         for item in items:
             if item.taken_on is not None:
                 return item.taken_on
         for item in items:
-            path = root / item.relpath
-            if not path.is_file():
+            path = resolve_path(item.relpath)
+            if not path.is_file() or path.stat().st_size <= 0:
                 continue
             exif = self._read_exif(path)
             if exif is not None:

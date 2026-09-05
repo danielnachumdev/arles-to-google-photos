@@ -184,7 +184,10 @@ class TestAlbumPublisher(PublisherSuite):
         album.id = "a4"
         album.productUrl = "https://photos.example/a4"
         order: list[str] = []
-        stamper.stamp_upload.side_effect = lambda *_a, **_k: order.append("stamp")
+        stamper.album_day_for.return_value = date(2012, 8, 2)
+        stamper.stamp_path.side_effect = lambda *_a, **_k: (
+            order.append("stamp") or date(2012, 8, 2)
+        )
 
         with patch("src.export.publisher.Album") as AlbumCls, patch(
             "src.export.publisher.MediaItem"
@@ -196,12 +199,9 @@ class TestAlbumPublisher(PublisherSuite):
             MediaItemCls.batchCreate.return_value = []
             AlbumPublisher(stamper=stamper).publish(gp, tmp_path, preview)
 
-        stamper.stamp_upload.assert_called_once()
-        stamped_root, stamped_items = stamper.stamp_upload.call_args.args
-        assert stamped_root == tmp_path
-        assert [item.id for item in stamped_items] == ["20120802_01", "20120802_02"]
-        assert order[0] == "stamp"
-        assert order.count("upload") == 2
+        assert stamper.album_day_for.called
+        assert stamper.stamp_path.call_count == 2
+        assert order == ["stamp", "upload", "stamp", "upload"]
 
     def test_publish_keeps_gallery_order_across_album_batches(self, tmp_path: Path) -> None:
         from src.export.publisher import AlbumPublisher

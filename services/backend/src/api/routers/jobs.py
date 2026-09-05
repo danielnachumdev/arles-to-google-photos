@@ -290,14 +290,16 @@ def get_media(
     chosen = (variant or "original").strip().lower()
     if chosen not in _MEDIA_VARIANTS:
         raise HTTPException(status_code=400, detail="invalid media variant")
-    root = deps.store.ensure_local_root(job_id)
     for item in preview.items:
         if item.id != item_id:
             continue
         relpath = _media_relpath(item, chosen)
         if relpath is None:
             raise HTTPException(status_code=404, detail="media missing")
-        path = root / relpath
+        try:
+            path = deps.store.ensure_artifact_file(job_id, relpath)
+        except FileNotFoundError as exc:
+            raise HTTPException(status_code=404, detail="media missing") from exc
         if not path.is_file():
             raise HTTPException(status_code=404, detail="media missing")
         return FileResponse(path)

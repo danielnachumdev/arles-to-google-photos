@@ -33,6 +33,9 @@ class _StoreLike(Protocol):
     def ensure_local_root(self, job_id: str) -> Path:
         ...
 
+    def ensure_artifact_file(self, job_id: str, relpath: str) -> Path:
+        ...
+
     def create_upload_from(
         self,
         source_id: str,
@@ -54,9 +57,21 @@ class _StoreLike(Protocol):
     def mark_done(self, job_id: str, product_url: str) -> Any:
         ...
 
+    def retains_full_local_tree(self) -> bool:
+        ...
+
 
 class _PublisherLike(Protocol):
-    def publish(self, gp: Any, root: Path, preview: AlbumPreview, sink: Any = None) -> Any:
+    def publish(
+        self,
+        gp: Any,
+        root: Path,
+        preview: AlbumPreview,
+        sink: Any = None,
+        *,
+        resolve: Any = None,
+        release: Any = None,
+    ) -> Any:
         ...
 
 
@@ -168,6 +183,23 @@ class PublishService:
                 raise JobCancelled()
             gp = self._gp_factory((access_token or "").strip())
             album_root = self._store.ensure_local_root(upload_id)
+
+            def resolve(relpath: str) -> Path:
+                return self._store.ensure_artifact_file(upload_id, relpath)
+
+            release = None
+            if not self._store.retains_full_local_tree():
+
+                def release(relpath: str) -> None:
+                    path = album_root / relpath
+                    if not path.is_file():
+                        return
+                    try:
+                        path.unlink()
+                        path.write_bytes(b"")
+                    except OSError:
+                        pass
+
             album = self._publisher.publish(
                 gp,
                 album_root,
@@ -175,6 +207,8 @@ class PublishService:
                 sink=cancellable_sink(
                     self._events.sink_for(upload_id), self._store, upload_id
                 ),
+                resolve=resolve,
+                release=release,
             )
             if store_is_cancelled(self._store, upload_id):
                 raise JobCancelled()
