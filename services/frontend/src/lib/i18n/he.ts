@@ -228,7 +228,8 @@ export const he: MessageCatalog = {
   preparing: 'מכין…',
   fileCount: (n) => (n === 1 ? 'קובץ אחד' : `${n} קבצים`),
 
-  sendingFiles: (n) => `שולח ${n} קבצים…`,
+  sendingFiles: (n) => `מעלה ${n} קבצים לשרת…`,
+  sendingFilesProgress: (n, percent) => `מעלה ${n} קבצים לשרת… ${percent}%`,
   uploadProgressLabel: (percent, loaded, total) =>
     total ? `${percent}% · ${loaded} / ${total}` : `${percent}%`,
   previewReady: 'התצוגה המקדימה מוכנה.',

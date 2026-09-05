@@ -397,7 +397,11 @@ export function AlbumWorkbench({
         accessToken: pending?.accessToken,
         onUploadProgress: (event) => {
           setUploadProgress(event)
-          setStatusLine(t.sendingFiles(payload.length))
+          setStatusLine(
+            event.total > 0
+              ? t.sendingFilesProgress(payload.length, event.percent)
+              : t.sendingFiles(payload.length),
+          )
         },
       })
       setUploadProgress(null)
