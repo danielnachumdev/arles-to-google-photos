@@ -433,6 +433,21 @@ class TestAlbumExportParser(ParserSuite):
         assert preview.journal.heading == "יומן"
         assert preview.journal.paragraphs == ("פסקה אחת",)
 
+    def test_journal_from_section1_without_word_prefix(self, tmp_path: Path) -> None:
+        """Older Arles/Word exports use div.Section1, not WordSection1."""
+        journal = """
+        <div class="Section1">
+          <p class="MsoNormal">כותרת יומן לדוגמה</p>
+          <p class="MsoNormal">פסקת גוף ראשונה לבדיקה.</p>
+        </div>
+        """
+        _write_album(tmp_path, journal_html=journal)
+        preview = AlbumExportParser().parse(tmp_path)
+
+        assert preview.journal is not None
+        assert preview.journal.heading == "כותרת יומן לדוגמה"
+        assert preview.journal.paragraphs == ("פסקת גוף ראשונה לבדיקה.",)
+
     @pytest.mark.skipif(
         not (DAY1_REAL / "index.html").is_file() or not (DAY1_REAL / "hrimages").is_dir(),
         reason="optional local album under data/ not present",

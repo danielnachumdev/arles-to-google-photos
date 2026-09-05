@@ -424,8 +424,9 @@ class AlbumExportParser:
         }
 
     def _parse_journal(self, soup: BeautifulSoup) -> Optional[AlbumJournal]:
+        # Arles/Word exports use WordSection1 (newer) or Section1 (common older).
         section = soup.find(
-            "div", class_=re.compile(r"(?:^|\s)WordSection1(?:\s|$)", re.I)
+            "div", class_=re.compile(r"(?:^|\s)(?:Word)?Section1(?:\s|$)", re.I)
         )
         if not isinstance(section, Tag):
             return None

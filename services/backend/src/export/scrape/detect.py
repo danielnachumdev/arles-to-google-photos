@@ -45,7 +45,8 @@ _THUMB_TN = re.compile(
 )
 _DIGITAL_DUTCH = re.compile(r"digitaldutch\.com", re.IGNORECASE)
 _BEGIN_TITLE = re.compile(r"<!--\s*BeginTitle\s*-->", re.IGNORECASE)
-_WORD_SECTION = re.compile(r"(?:^|\s)WordSection1(?:\s|$)", re.I)
+# WordSection1 (fixture / newer) or Section1 (common older Arles/Word exports).
+_WORD_SECTION = re.compile(r"(?:^|\s)(?:Word)?Section1(?:\s|$)", re.I)
 _PARAM_FILENAME = re.compile(r"^filename$", re.I)
 
 
