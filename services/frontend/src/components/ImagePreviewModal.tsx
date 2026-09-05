@@ -12,6 +12,8 @@ export type ImagePreviewTarget = {
   kind?: string | null
   relpath?: string | null
   poster?: string | null
+  /** When false, skip the player and explain that no browser copy exists. */
+  playable?: boolean
 }
 
 function previewCaption(target: ImagePreviewTarget): string {
@@ -64,6 +66,14 @@ export function ImagePreviewModal({
   const caption = previewCaption(target)
   const descriptionLabel = previewDescriptionLabel(target, t)
   const isVideo = previewItemKind(target) === 'video'
+  const hasPlayableSrc = target.playable !== false && Boolean(target.src.trim())
+  const showNoBrowserCopy = isVideo && !hasPlayableSrc
+  const showLoadFailed = isVideo && hasPlayableSrc && playFailed
+  const statusMessage = showNoBrowserCopy
+    ? t.videoPreviewNoBrowserCopy
+    : showLoadFailed
+      ? t.videoPreviewLoadFailed
+      : null
 
   return createPortal(
     <div
@@ -93,7 +103,7 @@ export function ImagePreviewModal({
         className="image-preview-modal__stage"
         onClick={onClose}
       >
-        {isVideo ? (
+        {isVideo && hasPlayableSrc ? (
           <video
             className="image-preview-modal__video"
             controls
@@ -103,6 +113,21 @@ export function ImagePreviewModal({
             onClick={(event) => event.stopPropagation()}
             onError={() => setPlayFailed(true)}
           />
+        ) : isVideo ? (
+          <div
+            className="image-preview-modal__video-fallback"
+            role="img"
+            aria-label={t.videoPreviewAria(target.id)}
+            onClick={(event) => event.stopPropagation()}
+          >
+            {target.poster ? (
+              <img
+                className="image-preview-modal__video-poster"
+                src={target.poster}
+                alt=""
+              />
+            ) : null}
+          </div>
         ) : (
           <img
             className="image-preview-modal__image"
@@ -112,9 +137,9 @@ export function ImagePreviewModal({
           />
         )}
       </div>
-      {isVideo && playFailed ? (
-        <p className="image-preview-modal__error" role="status">
-          {t.videoPreviewUnavailable}
+      {statusMessage ? (
+        <p className="image-preview-modal__error" role="status" dir="auto">
+          {statusMessage}
         </p>
       ) : null}
       {caption ? (

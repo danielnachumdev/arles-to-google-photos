@@ -246,6 +246,8 @@ export type MessageCatalog = {
   openVideoPreviewAria: (id: string) => string
   videoPreviewAria: (id: string) => string
   videoBadge: string
+  videoPreviewNoBrowserCopy: string
+  videoPreviewLoadFailed: string
   videoPreviewUnavailable: string
 
   close: string

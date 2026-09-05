@@ -144,8 +144,13 @@ describe('i18n catalogs', () => {
     expect(messages.en.videoBadge).toBe('Video')
     expect(messages.he.videoBadge).toBe('וידאו')
     expect(messages.en.videoPreviewUnavailable).toBe(
-      'This video cannot be played in the browser yet.',
+      'Could not load the video preview. Try again later, or publish — the original file is unchanged.',
     )
+    expect(messages.he.videoPreviewUnavailable).toContain('תצוגת הווידאו')
+    expect(messages.en.videoPreviewNoBrowserCopy).toMatch(/browser-playable/i)
+    expect(messages.he.videoPreviewNoBrowserCopy).toBeTruthy()
+    expect(messages.en.videoPreviewLoadFailed).toMatch(/Could not load/i)
+    expect(messages.he.videoPreviewLoadFailed).toBeTruthy()
   })
 
   it('implements interpolators in both catalogs', () => {

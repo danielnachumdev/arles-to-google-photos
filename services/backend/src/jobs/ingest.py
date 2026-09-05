@@ -10,7 +10,10 @@ from bs4.element import Tag
 
 from ..export.parser import STRUCTURE_FALLBACK_WARNING
 from ..export.preview import AlbumPreview
-from ..export.video_preview import ensure_local_video_previews
+from ..export.video_preview import (
+    ensure_local_video_previews,
+    persist_video_preview_sidecars,
+)
 from ..progress import JobCancelled
 from .cancel import cancellable_sink, store_is_cancelled
 from .events import AUDIENCE_UI, KIND_LOG
@@ -536,7 +539,8 @@ class IngestService:
         overwrite: bool,
         overwrite_files: Iterable[tuple[str, bytes, Optional[float]]],
     ) -> str:
-        ensure_local_video_previews(job.root)
+        created = ensure_local_video_previews(job.root) or ()
+        persist_video_preview_sidecars(self._store, job.id, job.root, created)
         preview = self._parser.parse(
             job.root,
             sink=cancellable_sink(

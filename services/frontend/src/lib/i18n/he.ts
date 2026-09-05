@@ -302,7 +302,12 @@ export const he: MessageCatalog = {
   openVideoPreviewAria: (id) => `תצוגה מקדימה של וידאו ${id}`,
   videoPreviewAria: (id) => `תצוגה מקדימה של וידאו ${id}`,
   videoBadge: 'וידאו',
-  videoPreviewUnavailable: 'לא ניתן לנגן את הווידאו בדפדפן עדיין.',
+  videoPreviewNoBrowserCopy:
+    'אין תצוגה מקדימה שניתנת לניגון בדפדפן לקובץ זה (לעיתים WMV בלי המרה ל־MP4). הפרסום עדיין מעלה את הקובץ המקורי.',
+  videoPreviewLoadFailed:
+    'לא ניתן לטעון את תצוגת הווידאו. נסו שוב מאוחר יותר, או פרסמו — הקובץ המקורי לא משתנה.',
+  videoPreviewUnavailable:
+    'לא ניתן לטעון את תצוגת הווידאו. נסו שוב מאוחר יותר, או פרסמו — הקובץ המקורי לא משתנה.',
 
   close: 'סגירה',
   toastDismissAria: 'סגירת הודעה',

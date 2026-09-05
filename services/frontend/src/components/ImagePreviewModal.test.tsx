@@ -170,6 +170,7 @@ describe('ImagePreviewModal', () => {
           src: '/api/jobs/job-1/media/clip01?variant=play',
           kind: 'video',
           relpath: video.relpath,
+          playable: true,
         }}
         onClose={() => undefined}
       />,
@@ -177,6 +178,29 @@ describe('ImagePreviewModal', () => {
     const player = document.querySelector('video')
     expect(player).toBeTruthy()
     fireEvent.error(player!)
-    expect(screen.getByRole('status')).toHaveTextContent(t.videoPreviewUnavailable)
+    expect(screen.getByRole('status')).toHaveTextContent(t.videoPreviewLoadFailed)
+  })
+
+  it('explains missing browser copy without mounting a broken player', () => {
+    render(
+      <ImagePreviewModal
+        target={{
+          id: 'clip01',
+          index: 1,
+          src: '',
+          kind: 'video',
+          relpath: 'hrimages/clip01hr.wmv',
+          playable: false,
+          poster: '/api/jobs/job-1/media/clip01?variant=thumb',
+        }}
+        onClose={() => undefined}
+      />,
+    )
+    expect(document.querySelector('video')).toBeNull()
+    expect(screen.getByRole('status')).toHaveTextContent(t.videoPreviewNoBrowserCopy)
+    expect(document.querySelector('.image-preview-modal__video-poster')).toHaveAttribute(
+      'src',
+      '/api/jobs/job-1/media/clip01?variant=thumb',
+    )
   })
 })

@@ -53,7 +53,7 @@ export class PreviewItemBuilder {
       taken_on: '2012-08-02',
       kind: 'video',
       thumb_relpath: 'thumbnails/TN_clip01.jpg',
-      play_relpath: 'hrimages/clip01hr.wmv',
+      play_relpath: 'preview/clip01.mp4',
       ...overrides,
     })
   }

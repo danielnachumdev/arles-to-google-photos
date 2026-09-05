@@ -13,6 +13,14 @@ const VIDEO_EXTENSIONS = new Set([
   '.mpeg',
 ])
 
+/** Formats HTML5 video can usually play without a transcoded sidecar. */
+const BROWSER_PLAYABLE_VIDEO = new Set(['.mp4', '.m4v', '.webm'])
+
+function extensionOf(relpath: string | null | undefined): string {
+  const match = (relpath ?? '').match(/(\.[^.\\/]+)$/)
+  return match ? match[1].toLowerCase() : ''
+}
+
 export function previewItemKind(
   item: Pick<PreviewItem, 'relpath' | 'kind'> | { relpath?: string | null; kind?: string | null },
 ): PreviewItemKind {
@@ -23,10 +31,24 @@ export function previewItemKind(
   if (explicit === 'image' || explicit === 'photo') {
     return 'image'
   }
-  const relpath = item.relpath ?? ''
-  const match = relpath.match(/(\.[^.\\/]+)$/)
-  const ext = match ? match[1].toLowerCase() : ''
-  return VIDEO_EXTENSIONS.has(ext) ? 'video' : 'image'
+  return VIDEO_EXTENSIONS.has(extensionOf(item.relpath)) ? 'video' : 'image'
+}
+
+/** True when the lightbox can request a browser-decodable play URL. */
+export function videoHasBrowserPlayableCopy(
+  item: Pick<PreviewItem, 'relpath' | 'kind' | 'play_relpath'> | {
+    relpath?: string | null
+    kind?: string | null
+    play_relpath?: string | null
+  },
+): boolean {
+  if (previewItemKind(item) !== 'video') {
+    return false
+  }
+  if (item.play_relpath?.trim()) {
+    return true
+  }
+  return BROWSER_PLAYABLE_VIDEO.has(extensionOf(item.relpath))
 }
 
 export function previewDescriptionLabel(

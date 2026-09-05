@@ -309,7 +309,12 @@ export const en: MessageCatalog = {
   openVideoPreviewAria: (id) => `Preview video ${id}`,
   videoPreviewAria: (id) => `Video preview ${id}`,
   videoBadge: 'Video',
-  videoPreviewUnavailable: 'This video cannot be played in the browser yet.',
+  videoPreviewNoBrowserCopy:
+    'No browser-playable preview is available for this video (often WMV without a converted MP4). Publishing still uploads the original file.',
+  videoPreviewLoadFailed:
+    'Could not load the video preview. Try again later, or publish — the original file is unchanged.',
+  videoPreviewUnavailable:
+    'Could not load the video preview. Try again later, or publish — the original file is unchanged.',
 
   close: 'Close',
   toastDismissAria: 'Dismiss notification',

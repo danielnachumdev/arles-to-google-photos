@@ -27,7 +27,7 @@ class TestLocalVideoPreviews(VideoPreviewSuite):
             dest.write_bytes(b"ftyp-fake")
             return True
 
-        ensure_local_video_previews(
+        created = ensure_local_video_previews(
             self.tmp_path, transcode=fake_transcode, extract_frame=fake_extract
         )
 
@@ -35,6 +35,10 @@ class TestLocalVideoPreviews(VideoPreviewSuite):
             b"\xff\xd8frame\xff\xd9"
         )
         assert (self.tmp_path / "preview" / "clip01.mp4").read_bytes() == b"ftyp-fake"
+        assert set(created) == {
+            "thumbnails/TN_clip01.jpg",
+            "preview/clip01.mp4",
+        }
 
     def test_ensure_local_video_previews_skips_when_sidecars_exist(self) -> None:
         thumbs = self.tmp_path / "thumbnails"
@@ -59,6 +63,23 @@ class TestLocalVideoPreviews(VideoPreviewSuite):
         assert calls == []
         assert (thumbs / "TN_clip01.jpg").read_bytes() == b"existing-poster"
         assert (preview / "clip01.mp4").read_bytes() == b"existing-mp4"
+
+    def test_persist_video_preview_sidecars_puts_new_files(self) -> None:
+        from unittest.mock import MagicMock
+
+        from src.export.video_preview import persist_video_preview_sidecars
+
+        preview = self.tmp_path / "preview"
+        preview.mkdir()
+        mp4 = preview / "clip01.mp4"
+        mp4.write_bytes(b"ftyp")
+        store = MagicMock()
+        persist_video_preview_sidecars(
+            store, "job-1", self.tmp_path, ("preview/clip01.mp4", "missing.mp4")
+        )
+        store.put_album_file.assert_called_once_with(
+            "job-1", "preview/clip01.mp4", mp4
+        )
 
     def test_ensure_local_video_previews_ignores_transcode_failure(self) -> None:
         self.hr.mkdir()

@@ -7,7 +7,10 @@ from typing import Any, Callable, Mapping, Optional, Protocol
 
 from ..export.parser import STRUCTURE_FALLBACK_WARNING
 from ..export.preview import AlbumPreview
-from ..export.video_preview import ensure_local_video_previews
+from ..export.video_preview import (
+    ensure_local_video_previews,
+    persist_video_preview_sidecars,
+)
 from ..progress import JobCancelled
 from .cancel import cancellable_sink, store_is_cancelled
 from .events import JobEventBus
@@ -264,7 +267,10 @@ class ReprocessService:
                 total=0,
             )
             album_root = self._store.ensure_local_root(job.id)
-            ensure_local_video_previews(album_root)
+            created = ensure_local_video_previews(album_root) or ()
+            persist_video_preview_sidecars(
+                self._store, job.id, album_root, created
+            )
             loose = not job_is_web_origin(job)
             preview = self._parser.parse(
                 album_root,

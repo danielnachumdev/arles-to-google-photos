@@ -24,7 +24,7 @@ import { withGooglePhotosAccessToken } from '../lib/withGooglePhotosToken.ts'
 import { isJobCancellable } from '../lib/formatJobDuration.ts'
 import { jobStatusLabel, jobTypeLabel, t } from '../lib/language.ts'
 import { computePreviewDirty } from '../lib/previewDirty.ts'
-import { previewItemKind } from '../lib/previewMedia.ts'
+import { previewItemKind, videoHasBrowserPlayableCopy } from '../lib/previewMedia.ts'
 import { isLifecycleJobEvent, isOpsJobEvent, jobLogMessage } from '../lib/jobLogs.ts'
 import { announceRunSubmitted, kindFromJobType, trackRun } from '../lib/runTracker.ts'
 import { toast } from '../lib/toast.ts'
@@ -1005,24 +1005,28 @@ export function AlbumWorkbench({
                   captionModified={Boolean(dirtyState.captions[item.id])}
                   showDateMismatch={inferImportOrigin(job) === 'folder'}
                   onCaption={(value) => setCaptions((prev) => ({ ...prev, [item.id]: value }))}
-                  onOpenPreview={() =>
+                  onOpenPreview={() => {
+                    const playable = kind !== 'video' || videoHasBrowserPlayableCopy(item)
                     setPreviewTarget({
                       id: item.id,
                       index: index + 1,
                       src:
                         kind === 'video'
-                          ? client.mediaUrl(job.id, item.id, 'play')
+                          ? playable
+                            ? client.mediaUrl(job.id, item.id, 'play')
+                            : ''
                           : client.mediaUrl(job.id, item.id, 'original'),
                       caption: captions[item.id] ?? item.caption,
                       kind,
                       relpath: item.relpath,
+                      playable: kind === 'video' ? playable : undefined,
                       poster: item.thumb_relpath
                         ? client.mediaUrl(job.id, item.id, 'thumb')
                         : kind === 'video'
                           ? null
                           : client.mediaUrl(job.id, item.id, 'thumb'),
                     })
-                  }
+                  }}
                 />
                 )
               })}

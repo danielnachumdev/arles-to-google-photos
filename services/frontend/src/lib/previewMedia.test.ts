@@ -4,6 +4,7 @@ import {
   previewDescriptionLabel,
   previewItemKind,
   previewOpenAria,
+  videoHasBrowserPlayableCopy,
 } from './previewMedia.ts'
 
 describe('previewItemKind', () => {
@@ -20,6 +21,34 @@ describe('previewItemKind', () => {
     expect(previewItemKind({ relpath: 'hrimages/clip.avi' })).toBe('video')
     expect(previewItemKind({ relpath: 'hrimages/20120802_01hr.JPG' })).toBe('image')
     expect(previewItemKind({})).toBe('image')
+  })
+})
+
+describe('videoHasBrowserPlayableCopy', () => {
+  it('is true for mp4 originals and play_relpath sidecars', () => {
+    expect(
+      videoHasBrowserPlayableCopy({ relpath: 'hrimages/clip.mp4', kind: 'video' }),
+    ).toBe(true)
+    expect(
+      videoHasBrowserPlayableCopy({
+        relpath: 'hrimages/clip.wmv',
+        kind: 'video',
+        play_relpath: 'preview/clip.mp4',
+      }),
+    ).toBe(true)
+  })
+
+  it('is false for WMV without a play sidecar', () => {
+    expect(
+      videoHasBrowserPlayableCopy({ relpath: 'hrimages/clip.wmv', kind: 'video' }),
+    ).toBe(false)
+    expect(
+      videoHasBrowserPlayableCopy({
+        relpath: 'hrimages/clip.wmv',
+        kind: 'video',
+        play_relpath: null,
+      }),
+    ).toBe(false)
   })
 })
 

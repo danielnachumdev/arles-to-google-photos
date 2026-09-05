@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable, Optional
+from typing import Callable, Optional, Protocol, Sequence, Tuple
 
 from .media_kinds import (
     BROWSER_PLAYABLE_VIDEO,
@@ -13,6 +13,17 @@ from .media_kinds import (
 
 TranscodeFn = Callable[[Path, Path], bool]
 ExtractFrameFn = Callable[[Path, Path], bool]
+
+
+class _AlbumFileStore(Protocol):
+    def put_album_file(
+        self,
+        job_id: str,
+        relpath: str,
+        path: Path,
+        mtime: Optional[float] = None,
+    ) -> None:
+        ...
 
 
 def transcode_to_mp4(source: Path, dest: Path) -> bool:
@@ -62,30 +73,57 @@ def ensure_local_video_previews(
     *,
     transcode: Optional[TranscodeFn] = None,
     extract_frame: Optional[ExtractFrameFn] = None,
-) -> None:
+) -> Tuple[str, ...]:
     """Create missing ``thumbnails/TN_{id}.jpg`` and ``preview/{id}.mp4`` sidecars.
 
-    Failures are ignored so folder import / scrape can still finish.
+    Returns album-relative paths created this call. Failures are ignored so
+    folder import / scrape can still finish.
     """
     root = Path(root)
     hr_dir = root / "hrimages"
     if not hr_dir.is_dir():
-        return
+        return ()
     transcode_fn = transcode or transcode_to_mp4
     extract_fn = extract_frame or extract_poster_frame
+    created: list[str] = []
     for path in list(hr_dir.iterdir()):
         if not path.is_file() or not is_video_filename(path.name):
             continue
         item_id = id_from_hr_stem(path.stem)
         if not _has_image_sidecar(root, item_id):
             dest = root / "thumbnails" / f"TN_{item_id}.jpg"
-            extract_fn(path, dest)
+            if extract_fn(path, dest):
+                created.append(dest.relative_to(root).as_posix())
         if path.suffix.lower() in BROWSER_PLAYABLE_VIDEO:
             continue
         play_dest = root / "preview" / f"{item_id}.mp4"
-        if play_dest.is_file():
+        if play_dest.is_file() and play_dest.stat().st_size > 0:
             continue
-        transcode_fn(path, play_dest)
+        if transcode_fn(path, play_dest):
+            created.append(play_dest.relative_to(root).as_posix())
+    return tuple(created)
+
+
+def persist_video_preview_sidecars(
+    store: _AlbumFileStore,
+    job_id: str,
+    root: Path,
+    relpaths: Sequence[str],
+) -> None:
+    """Best-effort durable upload of newly created video preview sidecars."""
+    root = Path(root)
+    for rel in relpaths:
+        safe = (rel or "").replace("\\", "/").lstrip("/")
+        if not safe or safe.startswith("..") or "/../" in f"/{safe}/":
+            continue
+        path = root / safe
+        if not path.is_file() or path.stat().st_size <= 0:
+            continue
+        try:
+            store.put_album_file(job_id, safe, path)
+        except Exception:
+            # Local sidecar is enough for this process; durable put is best-effort.
+            pass
 
 
 def _has_image_sidecar(root: Path, item_id: str) -> bool:
@@ -116,5 +154,6 @@ def _thumb_stem_id(stem: str) -> str:
 __all__ = [
     "ensure_local_video_previews",
     "extract_poster_frame",
+    "persist_video_preview_sidecars",
     "transcode_to_mp4",
 ]

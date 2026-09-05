@@ -17,6 +17,10 @@ RUN uv sync --frozen --no-dev --no-editable
 
 FROM python:3.12-slim
 
+RUN apt-get update \
+    && apt-get install -y --no-install-recommends ffmpeg \
+    && rm -rf /var/lib/apt/lists/*
+
 ENV PYTHONDONTWRITEBYTECODE=1 \
     PYTHONUNBUFFERED=1 \
     PATH="/app/.venv/bin:$PATH" \
@@ -33,6 +37,7 @@ COPY alembic /app/alembic
 # gp_wrapper.GooglePhotos() defaults to ./client_secrets.json under WORKDIR.
 # Mount credentials at runtime (see docker-compose.yml). Do not bake secrets into the image.
 # JobStore is in-memory: run a single uvicorn worker.
+# ffmpeg: required by moviepy for WMV→mp4 browser preview sidecars.
 
 EXPOSE 8000
 
