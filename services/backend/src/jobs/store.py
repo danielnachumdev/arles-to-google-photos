@@ -720,11 +720,13 @@ class JobStore:
         folder_label: Optional[str] = None,
         job_type: str = TYPE_PREVIEW,
         parent_job_id: Optional[str] = None,
+        source_job_id: Optional[str] = None,
         scrape_url: Optional[str] = None,
         scrape_headers: Optional[Dict[str, str]] = None,
         auto_publish: bool = False,
         import_origin: Optional[str] = None,
         owner_id: Optional[str] = None,
+        extra: Optional[Dict[str, Any]] = None,
     ) -> Job:
         self._ensure_backends(Path(base_dir))
         resolved_type = str(job_type or TYPE_PREVIEW).strip().lower()
@@ -746,11 +748,15 @@ class JobStore:
                 resolved_owner = self.get(parent_job_id).owner_id
             except JobNotFoundError:
                 resolved_owner = None
+        source = str(source_job_id).strip() if source_job_id else None
+        if source == "":
+            source = None
         record = JobRecord(
             id=job_id,
             status=STATUS_PENDING,
             type=resolved_type,
             folder_label=folder_label,
+            source_job_id=source,
             parent_job_id=parent_job_id,
             scrape_url=scrape_url,
             scrape_headers=headers,
@@ -758,8 +764,11 @@ class JobStore:
             auto_publish=bool(auto_publish),
             import_origin=origin,
             owner_id=resolved_owner,
+            extra=parse_extra(extra),
         )
-        self._require_artifacts().ensure_job(job_id, owner_id=resolved_owner)
+        # Shared-artifact children reuse the source tree; skip empty ensure_job.
+        if source is None:
+            self._require_artifacts().ensure_job(job_id, owner_id=resolved_owner)
         self._require_state().create(record)
         job = self._to_job(record, events=[])
         with self._lock:
@@ -771,26 +780,37 @@ class JobStore:
 
         Remote (GCS) backends hydrate HTML + media placeholders, not full
         media bodies. Use ``ensure_artifact_file`` for real bytes.
+
+        Hub fan-out children with ``extra.album_relpath`` get that subdirectory
+        as ``job.root`` while artifacts stay on ``source_job_id``.
         """
+        from .folder_hub import album_relpath_of
+
         with self._lock:
             job = self._require(job_id)
             artifact_id = job.source_job_id or job.id
             owner_id = job.owner_id
+            album_rel = album_relpath_of(job)
         root = self._require_artifacts().local_root(
             artifact_id, owner_id=owner_id, hydrate=True
         )
+        if album_rel:
+            root = root / album_rel
         with self._lock:
             self._require(job_id).root = root
         return root
 
     def ensure_artifact_file(self, job_id: str, relpath: str) -> Path:
         """Ensure one album file exists locally with real bytes."""
+        from .folder_hub import artifact_relpath_for
+
         with self._lock:
             job = self._require(job_id)
             artifact_id = job.source_job_id or job.id
             owner_id = job.owner_id
+            stored_rel = artifact_relpath_for(job, relpath)
         return self._require_artifacts().ensure_file(
-            artifact_id, relpath, owner_id=owner_id
+            artifact_id, stored_rel, owner_id=owner_id
         )
 
     def put_album_file(
@@ -801,13 +821,16 @@ class JobStore:
         mtime: Optional[float] = None,
     ) -> None:
         """Stream one local file into the job's durable artifact store."""
+        from .folder_hub import artifact_relpath_for
+
         with self._lock:
             job = self._require(job_id)
             artifact_id = job.source_job_id or job.id
             owner_id = job.owner_id
+            stored_rel = artifact_relpath_for(job, relpath)
         self._require_artifacts().put_file(
             artifact_id,
-            relpath,
+            stored_rel,
             Path(path),
             mtime,
             owner_id=owner_id,
