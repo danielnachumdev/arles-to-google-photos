@@ -366,9 +366,13 @@ export const en: MessageCatalog = {
   settingsOrchestratorSaved: 'Settings saved.',
   settingsOrchestratorError: (detail) => (detail ? `Could not save queue limit. ${detail}` : 'Could not save queue limit.'),
   settingsVersionHeading: 'App version',
-  settingsVersionHint: 'Build currently served by this server.',
+  settingsVersionHint:
+    'Version and image build time currently served by this server. After a deploy, refresh until the build time updates.',
   settingsVersionValue: (version) => `v${version}`,
+  settingsBuildTimeLabel: 'Image built',
+  settingsBuildTimeUnknown: 'unknown (local run or image without stamp)',
   appVersionLabel: (version) => `Version ${version}`,
+  appBuildTimeLabel: (buildTime) => `Built ${buildTime}`,
   jobsQueueSummary: (running, pending, waiting, max) =>
     `${running} running · ${pending} pending · ${waiting} waiting · max ${max}`,
 }

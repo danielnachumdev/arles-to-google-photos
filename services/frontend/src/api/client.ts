@@ -349,17 +349,25 @@ export class MigrationClient {
     return (await response.json()) as OrchestratorSettings
   }
 
-  async getVersion(): Promise<string> {
+  async getVersion(): Promise<{ version: string; build_time: string | null }> {
     const response = await fetch(`${this.baseUrl}/version`, { method: 'GET' })
     if (!response.ok) {
       await throwHttpError(response)
     }
-    const payload = (await response.json()) as { version?: unknown }
+    const payload = (await response.json()) as {
+      version?: unknown
+      build_time?: unknown
+    }
     const version = typeof payload.version === 'string' ? payload.version.trim() : ''
     if (!version) {
       throw new Error('version missing')
     }
-    return version
+    const buildTimeRaw = payload.build_time
+    const build_time =
+      typeof buildTimeRaw === 'string' && buildTimeRaw.trim()
+        ? buildTimeRaw.trim()
+        : null
+    return { version, build_time }
   }
 
   async patchSettings(maxConcurrentJobs: number): Promise<OrchestratorSettings> {

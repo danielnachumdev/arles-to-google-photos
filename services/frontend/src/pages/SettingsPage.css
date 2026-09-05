@@ -179,6 +179,12 @@
   text-align: start;
 }
 
+.settings-page__version--build {
+  font-size: 0.88rem;
+  font-weight: 500;
+  color: var(--color-rail);
+}
+
 @media (max-width: 40rem) {
   .settings-page__fields {
     grid-template-columns: minmax(0, 1fr);

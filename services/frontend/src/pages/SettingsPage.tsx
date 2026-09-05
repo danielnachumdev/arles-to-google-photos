@@ -28,6 +28,7 @@ export function SettingsPage() {
     waiting: number
   } | null>(null)
   const [appVersion, setAppVersion] = useState(APP_VERSION)
+  const [buildTime, setBuildTime] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [queueError, setQueueError] = useState<string | null>(null)
 
@@ -59,9 +60,10 @@ export function SettingsPage() {
       })
     void client
       .getVersion()
-      .then((version) => {
+      .then((info) => {
         if (!cancelled) {
-          setAppVersion(version)
+          setAppVersion(info.version)
+          setBuildTime(info.build_time)
         }
       })
       .catch(() => {
@@ -274,6 +276,10 @@ export function SettingsPage() {
           <p className="settings-page__hint">{t.settingsVersionHint}</p>
           <p className="settings-page__version" dir="ltr">
             {t.settingsVersionValue(appVersion)}
+          </p>
+          <p className="settings-page__version settings-page__version--build" dir="ltr">
+            {t.settingsBuildTimeLabel}:{' '}
+            {buildTime ? buildTime : t.settingsBuildTimeUnknown}
           </p>
         </fieldset>
       </div>

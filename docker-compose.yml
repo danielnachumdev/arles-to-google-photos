@@ -14,7 +14,11 @@
 
 services:
   backend:
-    build: ./services/backend
+    build:
+      context: ./services/backend
+      args:
+        # Empty → Dockerfile stamps UTC now into /etc/arles-build-time
+        BUILD_TIME: ${BUILD_TIME:-}
     working_dir: /app
     ports:
       - "8000:8000"

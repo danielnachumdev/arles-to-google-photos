@@ -126,6 +126,11 @@ describe('i18n catalogs', () => {
     expect(messages.en.settingsVersionHeading).toBe('App version')
     expect(messages.he.settingsVersionHeading).toBe('גרסת האפליקציה')
     expect(messages.en.settingsVersionValue('1.0.0')).toBe('v1.0.0')
+    expect(messages.en.settingsBuildTimeLabel).toBe('Image built')
+    expect(messages.he.settingsBuildTimeLabel).toBe('נבנה')
+    expect(messages.en.appBuildTimeLabel('2026-09-05T14:23:00Z')).toContain(
+      '2026-09-05T14:23:00Z',
+    )
     expect(messages.he.appVersionLabel('1.0.0')).toBe('גרסה 1.0.0')
     expect(messages.en.jobsQueueSummary(2, 6, 1, 2)).toBe(
       '2 running · 6 pending · 1 waiting · max 2',
@@ -230,7 +235,14 @@ describe('i18n catalogs', () => {
       )
       expect(catalog.errorScrapeEmpty(null)).toBeTruthy()
       expect(catalog.errorInterrupted).toBeTruthy()
-      expect(catalog.loadingAlbums).toBeTruthy()
+      expect(catalog.settingsVersionHeading).toBeTruthy()
+      expect(catalog.settingsVersionHint).toBeTruthy()
+      expect(catalog.settingsVersionValue('1.0.0')).toContain('1.0.0')
+      expect(catalog.settingsBuildTimeLabel).toBeTruthy()
+      expect(catalog.settingsBuildTimeUnknown).toBeTruthy()
+      expect(catalog.appBuildTimeLabel('2026-09-05T14:23:00Z')).toContain(
+        '2026-09-05T14:23:00Z',
+      )
       expect(catalog.loadingJobs).toBeTruthy()
       expect(catalog.loadingSettings).toBeTruthy()
       expect(catalog.loadingThumbnail).toBeTruthy()

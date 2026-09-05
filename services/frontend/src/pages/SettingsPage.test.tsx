@@ -277,7 +277,10 @@ describe('Settings max concurrent jobs', () => {
       vi.fn(async (input: RequestInfo | URL) => {
         const url = String(input)
         if (url.includes('/api/version')) {
-          return jsonResponse({ version: '1.0.0' })
+          return jsonResponse({
+            version: '1.0.0',
+            build_time: '2026-09-05T14:23:00Z',
+          })
         }
         return jsonResponse(SETTINGS)
       }),
@@ -287,6 +290,9 @@ describe('Settings max concurrent jobs', () => {
     expect(await screen.findByText(t.settingsVersionHeading)).toBeInTheDocument()
     const versions = await screen.findAllByText(t.settingsVersionValue('1.0.0'))
     expect(versions.length).toBeGreaterThanOrEqual(1)
+    expect(
+      await screen.findByText(/2026-09-05T14:23:00Z/),
+    ).toBeInTheDocument()
   })
 
   it('has exactly one Save button and a separate clear-cookies action', async () => {
@@ -401,7 +407,7 @@ describe('Settings max concurrent jobs', () => {
   it('shows a queue error when settings fail to load', async () => {
     vi.stubGlobal(
       'fetch',
-      vi.fn().mockResolvedValue(jsonResponse({ detail: 'down' }, 503)),
+      vi.fn(async () => jsonResponse({ detail: 'down' }, 503)),
     )
     renderAt('/settings')
 

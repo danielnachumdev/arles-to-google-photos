@@ -294,6 +294,9 @@ export type MessageCatalog = {
   settingsVersionHeading: string
   settingsVersionHint: string
   settingsVersionValue: (version: string) => string
+  settingsBuildTimeLabel: string
+  settingsBuildTimeUnknown: string
   appVersionLabel: (version: string) => string
+  appBuildTimeLabel: (buildTime: string) => string
   jobsQueueSummary: (running: number, pending: number, waiting: number, max: number) => string
 }

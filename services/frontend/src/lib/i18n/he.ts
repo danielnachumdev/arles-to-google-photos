@@ -358,9 +358,13 @@ export const he: MessageCatalog = {
   settingsOrchestratorError: (detail) =>
     detail ? `לא ניתן לשמור את מגבלת התור. ${detail}` : 'לא ניתן לשמור את מגבלת התור.',
   settingsVersionHeading: 'גרסת האפליקציה',
-  settingsVersionHint: 'הבנייה שמגישה השרת כרגע.',
+  settingsVersionHint:
+    'הגרסה וזמן בניית התמונה שמגיש השרת כרגע. אחרי פריסה, רעננו עד שזמן הבנייה מתעדכן.',
   settingsVersionValue: (version) => `v${version}`,
+  settingsBuildTimeLabel: 'נבנה',
+  settingsBuildTimeUnknown: 'לא ידוע (הרצה מקומית או תמונה בלי חותמת)',
   appVersionLabel: (version) => `גרסה ${version}`,
+  appBuildTimeLabel: (buildTime) => `נבנה ${buildTime}`,
   jobsQueueSummary: (running, pending, waiting, max) =>
     `${running} רצות · ${pending} ממתינות · ${waiting} בהמתנה · מקסימום ${max}`,
 }
