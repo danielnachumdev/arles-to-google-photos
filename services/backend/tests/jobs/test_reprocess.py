@@ -181,7 +181,7 @@ class TestReprocessService(MockJobServiceSuite):
         )
         events = MagicMock()
 
-        with pytest.raises(ValueError, match="index.html"):
+        with pytest.raises(RuntimeError, match="reprocess failed at parse"):
             _service(store, parser, events).reprocess("job-1")
 
         store.set_preview.assert_not_called()
@@ -196,6 +196,7 @@ class TestReprocessService(MockJobServiceSuite):
             error = status_args[2]
         assert error is not None
         assert "index.html" in str(error)
+        assert "reprocess failed at parse" in str(error)
 
         stages = _emit_stages(events)
         assert "error" in stages
