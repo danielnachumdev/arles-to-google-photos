@@ -187,6 +187,35 @@ class TestJobOrchestrator(OrchestratorSuite):
         release.set()
         assert entered[2].wait(timeout=2)
 
+    def test_submit_while_winding_down_queues_follow_up(
+        self, tmp_path: Path
+    ) -> None:
+        """Reprocess/retry must not no-op when status is done but the worker
+        has not left ``_running`` yet (same-id scrape reprocess flake)."""
+        store = JobStore.load(tmp_path)
+        orch = JobOrchestrator(store, max_concurrent=1)
+        first_marked_done = threading.Event()
+        release_first = threading.Event()
+        second_ran = threading.Event()
+        job = store.create(tmp_path)
+
+        def first_fn() -> None:
+            store.set_status(job.id, "done", job_type=job.type)
+            first_marked_done.set()
+            assert release_first.wait(timeout=5)
+
+        def second_fn() -> None:
+            store.set_status(job.id, "done", job_type=job.type)
+            second_ran.set()
+
+        orch.submit(job.id, first_fn)
+        assert first_marked_done.wait(timeout=2)
+        orch.submit(job.id, second_fn)
+        assert store.get(job.id).status == "pending"
+        release_first.set()
+        assert second_ran.wait(timeout=2)
+        _wait_status(store, job.id, "done")
+
     def test_cancel_pending_never_runs(self, tmp_path: Path) -> None:
         store = JobStore.load(tmp_path)
         orch = JobOrchestrator(store, max_concurrent=1)

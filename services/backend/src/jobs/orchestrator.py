@@ -73,6 +73,9 @@ class JobOrchestrator:
         self._fns: Dict[str, WorkFn] = {}
         self._running: Set[str] = set()
         self._waiting: Set[str] = set()
+        # Same-id re-submit while a worker is exiting after terminal status
+        # (e.g. scrape reprocess right after done). Run after `_run` finally.
+        self._follow_up: Dict[str, WorkFn] = {}
         loaded = max_concurrent
         if loaded is None:
             loaded = self._load_persisted_max()
@@ -137,7 +140,21 @@ class JobOrchestrator:
 
     def submit(self, job_id: str, fn: WorkFn) -> None:
         with self._lock:
-            if job_id in self._fns or job_id in self._running:
+            if job_id in self._running:
+                # Worker still exiting after marking terminal — queue follow-up
+                # so same-id reprocess/retry is not a silent no-op. Checked
+                # before `_fns`: the active run still owns an `_fns` entry.
+                self._follow_up[job_id] = fn
+                try:
+                    job = self._store.get(job_id)
+                except Exception:
+                    return
+                if job.status != STATUS_PENDING:
+                    self._store.set_status(
+                        job_id, STATUS_PENDING, job_type=job.type
+                    )
+                return
+            if job_id in self._fns:
                 return
             try:
                 job = self._store.get(job_id)
@@ -157,10 +174,11 @@ class JobOrchestrator:
         with self._lock:
             if job_id in self._running:
                 return False
+            follow = self._follow_up.pop(job_id, None)
             fn = self._fns.pop(job_id, None)
             in_pending = job_id in self._pending
             in_waiting = job_id in self._waiting
-            if fn is None and not in_pending and not in_waiting:
+            if fn is None and follow is None and not in_pending and not in_waiting:
                 return False
             self._pending = deque(item for item in self._pending if item != job_id)
             self._waiting.discard(job_id)
@@ -215,10 +233,18 @@ class JobOrchestrator:
         except Exception:
             return
         finally:
+            follow: Optional[WorkFn] = None
             with self._lock:
                 self._running.discard(job_id)
                 self._fns.pop(job_id, None)
-            self._settle_job(job_id)
+                follow = self._follow_up.pop(job_id, None)
+                if follow is not None:
+                    self._pending.append(job_id)
+                    self._fns[job_id] = follow
+            # Follow-up already flipped status to pending; don't settle into
+            # waiting/done before the same-id retry runs.
+            if follow is None:
+                self._settle_job(job_id)
             self._pump()
 
     def _still_executing(self, job_id: str) -> bool:
