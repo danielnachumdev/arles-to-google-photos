@@ -2,7 +2,7 @@
 
 This monorepo has no CLI product. Contributors run the FastAPI backend and the React UI (or Docker). User-facing install is in [Getting started](getting-started.md). **Internals, job types, and API sketch:** [AGENTS.md](../AGENTS.md).
 
-Do not vendor `gp_wrapper`. Do not commit `client_secrets.json` or other secrets.
+Do not vendor `google-photos-sdk` / `gpsdk`. Do not commit `client_secrets.json` or other secrets.
 
 ## Backend (`services/backend`)
 

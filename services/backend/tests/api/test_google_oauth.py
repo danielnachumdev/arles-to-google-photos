@@ -8,7 +8,7 @@ from tests.support.suites import OAuthSecretsSuite
 
 
 class TestGoogleOauthConfig(OAuthSecretsSuite):
-    def test_photos_scopes_match_gp_wrapper(self) -> None:
+    def test_photos_scopes_match_gpsdk(self) -> None:
         scopes = photos_scope_list()
         assert scopes == [
             "https://www.googleapis.com/auth/photoslibrary",

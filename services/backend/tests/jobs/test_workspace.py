@@ -2,7 +2,7 @@
 from datetime import datetime
 
 import pytest
-from gp_wrapper.utils import FileTimeService
+from gpsdk.utils import FileTimeService
 
 from tests.support.suites import WorkspaceSuite
 
