@@ -50,7 +50,9 @@ def alembic_config(url: str) -> Config:
         raise FileNotFoundError(f"alembic.ini not found at {ini_path}")
     cfg = Config(str(ini_path))
     cfg.set_main_option("script_location", str(root / "alembic"))
-    cfg.set_main_option("sqlalchemy.url", str(url).strip())
+    # ConfigParser treats % as interpolation; SQLAlchemy may percent-encode
+    # (e.g. str(engine.url) → sqlite:///%3Amemory%3A). Escape so set/get works.
+    cfg.set_main_option("sqlalchemy.url", str(url).strip().replace("%", "%%"))
     return cfg
 
 
