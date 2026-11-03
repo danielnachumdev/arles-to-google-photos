@@ -1,7 +1,6 @@
 version: 2
 updates:
-  # Backend uses uv.lock — ecosystem must be "uv" (not "pip") so version +
-  # security PRs get configured labels (including noBump for Semver CI).
+  # Backend uses uv.lock — ecosystem must be "uv" (not "pip").
   - package-ecosystem: "uv"
     directory: "/services/backend"
     schedule:
@@ -9,7 +8,6 @@ updates:
     open-pull-requests-limit: 10
     labels:
       - "dependencies"
-      - "noBump"
     groups:
       uv-production:
         dependency-type: "production"
@@ -23,7 +21,6 @@ updates:
     open-pull-requests-limit: 10
     labels:
       - "dependencies"
-      - "noBump"
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -32,4 +29,3 @@ updates:
     open-pull-requests-limit: 5
     labels:
       - "dependencies"
-      - "noBump"
