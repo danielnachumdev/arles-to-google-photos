@@ -6,7 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, patch
 
 import pytest
-from gp_wrapper import PositionType
+from gpsdk import PositionType
 
 from src.export.preview import AlbumJournal, AlbumPreview, PreviewItem
 from tests.support.suites import PublisherSuite

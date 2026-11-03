@@ -8,7 +8,7 @@ from typing import Any, Dict, Tuple
 
 import piexif
 import pytest
-from gp_wrapper.utils import FileTimeService
+from gpsdk.utils import FileTimeService
 
 from src.export.editor import PreviewEditor, PreviewEdits
 from src.export.parser import AlbumExportParser

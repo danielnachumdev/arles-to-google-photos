@@ -4,7 +4,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Callable, List, Optional, Protocol, Sequence
 
-from gp_wrapper import (
+from gpsdk import (
     MEDIA_ITEM_BATCH_CREATE_MAXIMUM_IDS,
     Album,
     AlbumPosition,
@@ -49,7 +49,7 @@ class _StamperLike(Protocol):
 
 
 class AlbumPublisher:
-    """Create a Photos album and attach preview media via gp_wrapper."""
+    """Create a Photos album and attach preview media via gpsdk."""
 
     def __init__(
         self,
@@ -231,7 +231,7 @@ def _batch_create_label(new_items: Sequence[NewMediaItem]) -> str:
 
 
 def _create_album(gp: GooglePhotos, title: str) -> Album:
-    """Create a Photos album; surface API failures that gp_wrapper masks as KeyError('id')."""
+    """Create a Photos album; surface API failures that gpsdk masks as KeyError('id')."""
     try:
         return Album.create(gp, title)
     except KeyError as exc:
@@ -245,7 +245,7 @@ def _create_album(gp: GooglePhotos, title: str) -> Album:
 
 
 def _chunk_text(text: str, limit: int = _ADD_TEXT_PART_LIMIT) -> List[str]:
-    """Split text so each gp_wrapper add_text part stays within Google's limit."""
+    """Split text so each gpsdk add_text part stays within Google's limit."""
     if not text:
         return []
     return [text[i:i + limit] for i in range(0, len(text), limit)]

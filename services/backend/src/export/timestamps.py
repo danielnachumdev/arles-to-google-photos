@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Callable, Optional, Sequence
 
 import piexif
-from gp_wrapper.utils import FileTime, FileTimeService
+from gpsdk.utils import FileTime, FileTimeService
 
 from .media_kinds import is_video_filename
 from .preview import PreviewItem
@@ -176,7 +176,7 @@ class CaptureTimestampStamper:
     ) -> None:
         """Embed creation_time in the MP4 bytes Google Photos actually uploads.
 
-        Filesystem mtime is not part of the upload payload. ``gp_wrapper`` converts
+        Filesystem mtime is not part of the upload payload. ``gpsdk`` converts
         non-MP4 videos (``.mov`` / ``.wmv``) to ``{stem}.mp4`` at upload time when
         that companion is missing — and moviepy's new file gets *today* as
         creation_time. Prepare (or reuse) that companion here and stamp it.
@@ -224,7 +224,7 @@ class CaptureTimestampStamper:
         return None
 
     def _transcode_to_mp4(self, source: Path, dest: Path) -> bool:
-        """Create the ``.mp4`` companion ``gp_wrapper.upload_media`` will prefer."""
+        """Create the ``.mp4`` companion ``gpsdk.upload_media`` will prefer."""
         try:
             import imageio_ffmpeg
         except ImportError:

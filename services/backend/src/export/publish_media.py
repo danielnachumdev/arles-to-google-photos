@@ -18,7 +18,7 @@ class PublishMediaPreparer:
     """Resolve upload bytes for one preview item.
 
     Non-MP4 videos must become a real (non-empty) ``.mp4`` before
-    ``gp_wrapper`` / Photos see them. On Cloud Run, ``play_relpath`` often
+    ``gpsdk`` / Photos see them. On Cloud Run, ``play_relpath`` often
     exists as a 0-byte sparse placeholder — this class hydrates it via
     ``resolve`` instead of copying emptiness into the sibling companion.
     """

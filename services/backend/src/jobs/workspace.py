@@ -5,7 +5,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Optional
 
-from gp_wrapper.utils import FileTime, FileTimeService
+from gpsdk.utils import FileTime, FileTimeService
 
 
 class JobWorkspace:

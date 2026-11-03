@@ -1,5 +1,5 @@
 version = 1
-revision = 5
+revision = 3
 requires-python = ">=3.11"
 resolution-markers = [
     "python_full_version >= '3.15'",
@@ -60,13 +60,12 @@ wheels = [
 name = "arles-migrator-backend"
 version = "1.0.0"
 source = { editable = "." }
-default-groups = []
 dependencies = [
     { name = "alembic" },
     { name = "beautifulsoup4" },
     { name = "fastapi" },
     { name = "google-cloud-storage" },
-    { name = "gp-wrapper" },
+    { name = "google-photos-sdk" },
     { name = "piexif" },
     { name = "pillow" },
     { name = "psycopg", extra = ["binary"] },
@@ -94,7 +93,7 @@ requires-dist = [
     { name = "beautifulsoup4" },
     { name = "fastapi" },
     { name = "google-cloud-storage", specifier = ">=2.14.0" },
-    { name = "gp-wrapper", specifier = ">=0.9.12" },
+    { name = "google-photos-sdk", specifier = ">=1.0.0" },
     { name = "piexif", specifier = ">=1.1.3" },
     { name = "pillow", specifier = ">=13.0.0" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.1.18" },
@@ -755,6 +754,22 @@ wheels = [
 ]
 
 [[package]]
+name = "google-photos-sdk"
+version = "1.0.0"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "google-api-python-client" },
+    { name = "google-auth-httplib2" },
+    { name = "google-auth-oauthlib" },
+    { name = "moviepy" },
+    { name = "requests" },
+    { name = "tqdm" },
+]
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/49/c9/2c01adbbb6906ae1c6e44641dca66edb877655314d0de1fb975c1afdf37c/google_photos_sdk-1.0.0-py3-none-any.whl", hash = "sha256:1cb3b15bf129f738eecc5039b27d35c482b310f48611110713f8fa82d7471bc7", size = 38234, upload-time = "2026-11-03T18:45:06.667Z" },
+]
+
+[[package]]
 name = "google-resumable-media"
 version = "2.10.1"
 source = { registry = "https://pypi.org/simple" }
@@ -777,20 +792,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/72/73/74bcab964c9a7a61f
 wheels = [
     { url = "https://files.pythonhosted.org/packages/9a/51/186c02b8549b69ccda44429cf6ff5081e4b61a602ddfe6a8020d1be31d1b/googleapis_common_protos-1.75.1-py3-none-any.whl", hash = "sha256:28a1934bcd33b9c9da66ac301a0a4227e3367f095a17d0375cb98f0a09d93b79", size = 300626, upload-time = "2026-08-06T06:23:46.696Z" },
 ]
-
-[[package]]
-name = "gp-wrapper"
-version = "0.9.12"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "google-api-python-client" },
-    { name = "google-auth-httplib2" },
-    { name = "google-auth-oauthlib" },
-    { name = "moviepy" },
-    { name = "requests" },
-    { name = "tqdm" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/e2/9d/4cfefac8513bb8ce4e9e7ca0c439d4378b6ecdec1f6e988c846f235b3c53/gp_wrapper-0.9.12.tar.gz", hash = "sha256:340a9a30d48c223995d92ac33de50daff1da0b30e270705cfc578b7bb6d1f181", size = 47662, upload-time = "2026-09-02T17:45:40.27Z" }
 
 [[package]]
 name = "h11"

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import requests
 from google.oauth2.credentials import Credentials
-from gp_wrapper import GooglePhotos
+from gpsdk import GooglePhotos
 
 
 def google_photos_from_access_token(access_token: str) -> GooglePhotos:

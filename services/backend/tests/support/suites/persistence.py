@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 import pytest
-from gp_wrapper.utils import FileTimeService
+from gpsdk.utils import FileTimeService
 
 from src.export.parser import AlbumExportParser
 from src.export.preview import AlbumPreview

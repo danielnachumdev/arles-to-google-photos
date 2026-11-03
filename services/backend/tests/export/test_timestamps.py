@@ -96,7 +96,7 @@ class TestCaptureTimestampStamper(TimestampSuite):
         assert abs((self.mtime(path) - datetime(2012, 8, 2, 0, 0, 0)).total_seconds()) <= 2
 
     def test_stamp_wmv_stamps_companion_mp4_used_by_upload_transcode(self) -> None:
-        """gp_wrapper uploads stem.mp4 when present; it must carry creation_time."""
+        """gpsdk uploads stem.mp4 when present; it must carry creation_time."""
         wmv = self.tmp_path / "hrimages" / "clip01hr.wmv"
         play = self.tmp_path / "preview" / "clip01.mp4"
         wmv.parent.mkdir(parents=True, exist_ok=True)
@@ -155,7 +155,7 @@ class TestCaptureTimestampStamper(TimestampSuite):
 
 
     def test_stamp_wmv_without_play_sidecar_still_builds_upload_mp4(self) -> None:
-        """gp_wrapper converts WMV→MP4 at upload; that file must exist with creation_time."""
+        """gpsdk converts WMV→MP4 at upload; that file must exist with creation_time."""
         wmv = self.tmp_path / "hrimages" / "clip01hr.wmv"
         wmv.parent.mkdir(parents=True, exist_ok=True)
         # Real tiny WMV via ffmpeg so transcode has a decodeable source.
@@ -180,7 +180,7 @@ class TestCaptureTimestampStamper(TimestampSuite):
         assert self.mp4_creation_time(companion) == datetime(2012, 8, 2, 0, 0, 0)
 
     def test_stamp_mov_builds_companion_mp4_not_only_source(self) -> None:
-        """gp_wrapper also converts MOV→MP4; stamping only the .mov leaves today on Photos."""
+        """gpsdk also converts MOV→MP4; stamping only the .mov leaves today on Photos."""
         mov = self.tmp_path / "hrimages" / "clip01hr.MOV"
         mov.parent.mkdir(parents=True, exist_ok=True)
         self.write_mov(mov)
