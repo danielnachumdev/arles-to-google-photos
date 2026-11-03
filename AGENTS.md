@@ -1,21 +1,35 @@
 # Arles Migrator – Agent Context
 
+Implementation guide for coding agents changing **arles-to-google-photos**. Product pitch and user-facing install: [`README.md`](README.md) + [`docs/`](docs/).
+
+---
+
+## Orientation
+
+| Question | Answer |
+| -------- | ------ |
+| What is this? | Monorepo migrator: Arles HTML albums → Google Photos (**no CLI**) |
+| Backend | `services/backend/` — FastAPI (`uvicorn src.api.app:app`, import package is literally `src`) |
+| Frontend | `services/frontend/` — React + Vite + TypeScript |
+| Toolchain | Backend: [uv](https://docs.astral.sh/uv/) + `pyproject.toml` / `uv.lock`. Frontend: npm |
+| Python | `>=3.11` (`requires-python` in `services/backend/pyproject.toml`) |
+| Tests | Backend `uv run pytest`; frontend `npm test` + `npx tsc -b` — **never delete** |
+| Secrets | Never commit `client_secrets.json`, API keys, Photos tokens |
+
 ## Project overview
 
-This monorepo migrates **Arles HTML album exports** into Google Photos. **No CLI.** User-facing docs live in [`docs/`](docs/).
-
-- **`services/backend`** — FastAPI job API (`src.api.app:app` on `:8000`). Parses `index.html` / per-image HTML pages, materializes uploads, preview/edits (including journal), stamps capture times, and publishes via [`gp_wrapper`](../gp_wrapper/). Package root: `services/backend/`. Import package is literally `src` (`uvicorn src.api.app:app`). Managed with **uv** + `pyproject.toml`.
-- **`services/frontend`** — React + Vite + TypeScript UI (`:5173`). **New** import desk (Arles URL default, or folder upload) → SSE preview → edits → publish. **Saved albums** (`/albums`) is one card per gallery title already on this server (not the live site, not every run; independent of job hide/archive). **Jobs** (`/jobs`) lists every non-archived run (hide/archive finished runs from the list). Reprocess: folder albums reparse stored files; web albums re-download from the original URL (confirm first).
+- **`services/backend`** — FastAPI job API (`src.api.app:app` on `:8000`). Parses `index.html` / per-image HTML pages, materializes uploads, preview/edits (including journal), stamps capture times, and publishes via [`gp_wrapper`](https://github.com/danielnachumdev/gp_wrapper). Package root: `services/backend/`. Managed with **uv** + `pyproject.toml`.
+- **`services/frontend`** — React + Vite + TypeScript UI (`:5173`). Import desk (Arles URL default, or folder upload) → SSE preview → edits → publish. **Saved albums** (`/albums`) is one card per gallery title already on this server (not the live site, not every run; independent of job hide/archive). **Jobs** (`/jobs`) lists every non-archived run (hide/archive finished runs from the list). Reprocess: folder albums reparse stored files; web albums re-download from the original URL (confirm first).
 - **Root `docker-compose.yml`** — uvicorn backend + nginx frontend (`/api` proxy, SSE-friendly, unlimited upload body).
 
-Do not commit `client_secrets.json` or other secrets. Do not vendor `gp_uploader`.
+Do not commit `client_secrets.json` or other secrets. Do not vendor `gp_wrapper` / `gp_uploader`.
 
 ## Repository structure
 
 ```
 .
 ├── .github/
-│   └── workflows/           # CI orchestrator + per-service reusable workflows
+│   └── workflows/           # Thin CI/CD orchestrators → danielnachumdev/actions@latest
 ├── services/
 │   ├── backend/
 │   │   ├── src/
@@ -78,9 +92,9 @@ ALBUM_FOLDER/
 
 ## Tech stack
 
-- **Backend language:** Python 3.9+ preferred
+- **Backend language:** Python **>=3.11**
 - **Backend toolchain:** [uv](https://docs.astral.sh/uv/) + `pyproject.toml` / `uv.lock`
-- **Backend runtime:** `[project].dependencies` — `gp_wrapper>=0.9.12`, `beautifulsoup4`, `tqdm`, `fastapi`, `uvicorn`, `python-multipart`, `piexif>=1.1.3`, `google-cloud-storage>=2.14.0`, `sqlalchemy>=2.0.25`, `psycopg[binary]`, `alembic`
+- **Backend runtime:** `[project].dependencies` — `gp_wrapper>=0.9.12`, `beautifulsoup4`, `tqdm`, `fastapi`, `uvicorn`, `python-multipart`, `piexif>=1.1.3`, `google-cloud-storage>=2.14.0`, `sqlalchemy>=2.0.25,<3`, `psycopg[binary]>=3.1.18`, `alembic>=1.16.5`, `pillow>=13.0.0`
 - **Schema migrations:** Alembic under `services/backend/alembic/` (`alembic.ini` + declarative models in `src/jobs/persistence/models.py`). `SqlAlchemyStateStore` construction runs `migrate.upgrade_head` (fail closed). Same URL as the app (`DATABASE_URL` / local `{JOBS_ROOT}/migrator.sqlite`). Manual: `uv run alembic upgrade head` from `services/backend`. Do not use ad-hoc `ALTER TABLE` / `create_all` for new columns — add a revision.
 - **Backend dev:** `[dependency-groups].dev` — mypy, pylint, pytest, pytest-cov, pytest-xdist, httpx, typing stubs
 - **Lock constraint:** `tool.uv.constraint-dependencies` pins `moviepy>=1.0.3,<2` because gp_wrapper imports `moviepy.editor` (removed in moviepy 2.x)
@@ -144,7 +158,22 @@ Preview JSON includes `journal`, `taken_on` (ISO date or null), `last_modified`,
 
 - **Backend:** from `services/backend`, `uv run pytest` (pythonpath `.`; quiet + `-n auto` + `src` coverage with missing lines). Fixture trees: `tests/fixtures/day1_mini` and `tests/fixtures/day1_arles`.
 - **Frontend:** from `services/frontend`, `npm test` (vitest) and `npx tsc -b`.
-- **CI:** GitHub Actions (`.github/workflows/ci.yml`) runs on pull requests and pushes to `main`. It delegates to per-service reusable workflows: backend `uv run pytest`, frontend `npm test` + `npx tsc -b`.
+- **CI:** thin orchestrator `.github/workflows/ci.yml` on PRs and pushes to `main` — Backend + Frontend jobs via [`danielnachumdev/actions`](https://github.com/danielnachumdev/actions) (`ci.yml@latest`), then aggregate job **`CI`**. Semver label validation on PRs via `semver-ci.yml@latest`.
+
+## PRs, CI, and releases
+
+1. Branch off `main`; open a PR into `main`.
+2. Attach **exactly one** semver label: `noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor`.
+3. **CI** — Backend (uv pytest) + Frontend (npm test / `tsc`) + aggregate **`CI`**; **`Semver / Semver`** validates the label. Prefer requiring **`CI`** and **`Semver / Semver`**.
+4. **CD** — `.github/workflows/cd.yml` → `semver-cd.yml@latest` after CI succeeds on `main`: bump → wheel → GitHub Release → floating `vMAJOR`, or skip on `noBump`. PyPI publish is **off** unless `publish-pypi: true` is enabled.
+5. Version **source of truth** is GitHub Release tags. If none yet, CD seeds from backend `pyproject.toml`.
+6. Dependabot PRs stay on `noBump` (auto-merge when CI + Semver pass).
+7. Change shared CI/semver behavior in **`danielnachumdev/actions`**, not by re-vendoring here. How to adopt: [`HOW-TO-USE.md`](https://github.com/danielnachumdev/actions/blob/v1/HOW-TO-USE.md).
+
+### Repo gates (already configured)
+
+- `.github/CODEOWNERS` — `@danielnachumdev`
+- Branch protection / ruleset: required **`CI`** + **`Semver / Semver`**; code-owner reviews; no force-push to `main`
 
 ## Code conventions
 
@@ -176,7 +205,7 @@ Preview JSON includes `journal`, `taken_on` (ISO date or null), `last_modified`,
 | `services/frontend/src/pages/AlbumWorkbench.tsx` | Folder picker, history, preview desk, reprocess, publish |
 | `services/frontend/nginx.conf` | `/api` proxy, SSE (`proxy_buffering off`), unlimited body |
 | `docker-compose.yml` | uvicorn + nginx stack; `client_secrets.json` + `jobs-data` |
-| `.github/workflows/ci.yml` | CI orchestrator; calls per-service reusable test workflows |
+| `.github/workflows/ci.yml` | Thin CI orchestrator (Backend + Frontend + aggregate `CI` + Semver) |
 | `README.md` | Short landing page; details in `docs/` |
 | `docs/` | Getting started, OAuth, album layout, web import, using the app, persistence, development |
 

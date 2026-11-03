@@ -6,7 +6,7 @@ Do not vendor `gp_wrapper`. Do not commit `client_secrets.json` or other secrets
 
 ## Backend (`services/backend`)
 
-Python 3.9+, managed with [uv](https://docs.astral.sh/uv/). The import package is literally `src` (`uvicorn src.api.app:app`).
+Python **3.11+** (`requires-python = ">=3.11"`), managed with [uv](https://docs.astral.sh/uv/). The import package is literally `src` (`uvicorn src.api.app:app`).
 
 ```bash
 cd services/backend
