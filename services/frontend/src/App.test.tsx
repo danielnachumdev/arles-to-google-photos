@@ -179,7 +179,9 @@ describe('App routes', () => {
   it('restores document title when leaving an album page', async () => {
     const { unmount } = harness.renderApp('/albums/job-summer')
     await screen.findByLabelText(t.titleLabel)
-    expect(document.title).toBe(t.albumDocumentTitle('קיץ 2012'))
+    await waitFor(() => {
+      expect(document.title).toBe(t.albumDocumentTitle('קיץ 2012'))
+    })
     unmount()
     expect(document.title).toBe(t.documentTitle)
   })
