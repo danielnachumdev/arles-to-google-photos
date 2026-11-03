@@ -1,18 +1,64 @@
 name: CI
 
+# Thin orchestrator for monorepo (backend Python + frontend Node).
+# Prefer requiring checks "CI" (aggregate) and "Semver / Semver".
+# Semver at CI = validate exactly one of: noBump | bumpPatch | bumpMinor | bumpMajor
+
 on:
   push:
-    branches:
-      - main
+    branches: [main]
   pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
 
 permissions:
   contents: read
+  pull-requests: read
 
 jobs:
   backend:
-    uses: ./.github/workflows/ci-backend.yml
+    name: Backend
+    uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
+    with:
+      working-directory: services/backend
+      disable-node: true
+      sync-args: "--group dev"
 
   frontend:
-    uses: ./.github/workflows/ci-frontend.yml
+    name: Frontend
+    uses: danielnachumdev/actions/.github/workflows/ci.yml@v1
+    with:
+      working-directory: services/frontend
+      disable-python: true
+      # Prior CI was Node 22 only; default matrix includes 20 where vitest asserts flake.
+      node-versions: '["22"]'
+
+  # Aggregate gate → single required check name "CI" (local job, not reusable).
+  ci:
+    name: CI
+    needs: [backend, frontend]
+    if: always() && !cancelled()
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Require backend + frontend success
+        env:
+          BACKEND: ${{ needs.backend.result }}
+          FRONTEND: ${{ needs.frontend.result }}
+        run: |
+          set -euo pipefail
+          echo "backend=${BACKEND} frontend=${FRONTEND}"
+          [[ "${BACKEND}" == "success" ]]
+          [[ "${FRONTEND}" == "success" ]]
+
+  semver:
+    name: Semver
+    if: github.event_name == 'pull_request'
+    uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@v1
+    with:
+      standards-ref: v1
