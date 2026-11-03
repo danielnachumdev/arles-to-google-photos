@@ -78,7 +78,7 @@ How to edit, publish, reprocess, restart, and cancel: [Using the app](docs/using
 
 Local toolchain, tests, and package layout: [docs/development.md](docs/development.md). Internals, job API, and CI/CD labels: [AGENTS.md](AGENTS.md).
 
-**CI:** GitHub Actions runs backend (`uv run pytest`) and frontend (`npm test`, `npx tsc -b`) on PRs and pushes to `main`. PRs need **exactly one** semver label (`noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor`).
+**CI:** GitHub Actions runs backend (`uv run pytest`) and frontend (`npm test`, `npx tsc -b`) on PRs and pushes to `main`.
 
 ## License
 

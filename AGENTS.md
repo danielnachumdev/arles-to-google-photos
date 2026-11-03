@@ -158,22 +158,20 @@ Preview JSON includes `journal`, `taken_on` (ISO date or null), `last_modified`,
 
 - **Backend:** from `services/backend`, `uv run pytest` (pythonpath `.`; quiet + `-n auto` + `src` coverage with missing lines). Fixture trees: `tests/fixtures/day1_mini` and `tests/fixtures/day1_arles`.
 - **Frontend:** from `services/frontend`, `npm test` (vitest) and `npx tsc -b`.
-- **CI:** thin orchestrator `.github/workflows/ci.yml` on PRs and pushes to `main` — Backend + Frontend jobs via [`danielnachumdev/actions`](https://github.com/danielnachumdev/actions) (`ci.yml@latest`), then aggregate job **`CI`**. Semver label validation on PRs via `semver-ci.yml@latest`.
+- **CI:** thin orchestrator `.github/workflows/ci.yml` on PRs and pushes to `main` — Backend + Frontend jobs via [`danielnachumdev/actions`](https://github.com/danielnachumdev/actions) (`ci.yml@latest`), then aggregate job **`CI`**. No Semver (non-publisher app).
 
-## PRs, CI, and releases
+## PRs and CI
 
 1. Branch off `main`; open a PR into `main`.
-2. Attach **exactly one** semver label: `noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor`.
-3. **CI** — Backend (uv pytest) + Frontend (npm test / `tsc`) + aggregate **`CI`**; **`Semver / Semver`** validates the label. Prefer requiring **`CI`** and **`Semver / Semver`**.
-4. **CD** — `.github/workflows/cd.yml` → `semver-cd.yml@latest` after CI succeeds on `main`: bump → wheel → GitHub Release → floating `vMAJOR`, or skip on `noBump`. PyPI publish is **off** unless `publish-pypi: true` is enabled.
-5. Version **source of truth** is GitHub Release tags. If none yet, CD seeds from backend `pyproject.toml`.
-6. Dependabot PRs stay on `noBump` (auto-merge when CI + Semver pass).
-7. Change shared CI/semver behavior in **`danielnachumdev/actions`**, not by re-vendoring here. How to adopt: [`HOW-TO-USE.md`](https://github.com/danielnachumdev/actions/blob/v1/HOW-TO-USE.md).
+2. **CI** — Backend (uv pytest) + Frontend (npm test / `tsc`) + aggregate **`CI`**. Prefer requiring **`CI`**.
+3. This app is **not** a Semver publisher — no bump labels, no `semver-ci` / `semver-cd`.
+4. Dependabot auto-merges when aggregate **`CI`** succeeds (`always()` + `needs.ci.result == 'success'`).
+5. Change shared CI / Dependabot-auto-merge behavior in **`danielnachumdev/actions`**, not by re-vendoring here. How to adopt: [`HOW-TO-USE.md`](https://github.com/danielnachumdev/actions/blob/v1/HOW-TO-USE.md).
 
 ### Repo gates (already configured)
 
 - `.github/CODEOWNERS` — `@danielnachumdev`
-- Branch protection / ruleset: required **`CI`** + **`Semver / Semver`**; code-owner reviews; no force-push to `main`
+- Branch protection / ruleset: required **`CI`**; code-owner reviews; no force-push to `main`
 
 ## Code conventions
 
@@ -205,7 +203,7 @@ Preview JSON includes `journal`, `taken_on` (ISO date or null), `last_modified`,
 | `services/frontend/src/pages/AlbumWorkbench.tsx` | Folder picker, history, preview desk, reprocess, publish |
 | `services/frontend/nginx.conf` | `/api` proxy, SSE (`proxy_buffering off`), unlimited body |
 | `docker-compose.yml` | uvicorn + nginx stack; `client_secrets.json` + `jobs-data` |
-| `.github/workflows/ci.yml` | Thin CI orchestrator (Backend + Frontend + aggregate `CI` + Semver) |
+| `.github/workflows/ci.yml` | Thin CI orchestrator (Backend + Frontend + aggregate `CI` + Dependabot auto-merge) |
 | `README.md` | Short landing page; details in `docs/` |
 | `docs/` | Getting started, OAuth, album layout, web import, using the app, persistence, development |
 
