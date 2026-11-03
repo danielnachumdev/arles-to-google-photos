@@ -52,6 +52,12 @@ class TestAlembicLayout:
         assert "alembic.ini" in text
         assert re.search(r"COPY\s+alembic\b", text) or "COPY alembic " in text
 
+    def test_alembic_config_accepts_percent_encoded_url(self) -> None:
+        """str(engine.url) percent-encodes :memory:; ConfigParser must not choke."""
+        encoded = "sqlite:///%3Amemory%3A"
+        cfg = alembic_config(encoded)
+        assert cfg.get_main_option("sqlalchemy.url") == encoded
+
 
 class TestUpgradeEmptyDatabase:
     def test_upgrade_head_creates_expected_tables_and_columns(
