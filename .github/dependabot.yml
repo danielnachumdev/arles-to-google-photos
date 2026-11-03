@@ -1,6 +1,8 @@
 version: 2
 updates:
-  - package-ecosystem: "pip"
+  # Backend uses uv.lock — ecosystem must be "uv" (not "pip") so version +
+  # security PRs get configured labels (including noBump for Semver CI).
+  - package-ecosystem: "uv"
     directory: "/services/backend"
     schedule:
       interval: "weekly"
@@ -9,9 +11,9 @@ updates:
       - "dependencies"
       - "noBump"
     groups:
-      pip-production:
+      uv-production:
         dependency-type: "production"
-      pip-development:
+      uv-development:
         dependency-type: "development"
 
   - package-ecosystem: "npm"
