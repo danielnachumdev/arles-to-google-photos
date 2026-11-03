@@ -2,7 +2,7 @@
 name = "arles-migrator-backend"
 version = "1.0.0"
 description = "FastAPI service to migrate Arles HTML album exports into Google Photos"
-requires-python = ">=3.9"
+requires-python = ">=3.11"
 # Runtime / publish group (formerly requirements/publish.txt).
 # Install with: uv sync
 dependencies = [
@@ -17,7 +17,7 @@ dependencies = [
     "sqlalchemy>=2.0.25,<3",
     "psycopg[binary]>=3.1.18",
     "alembic>=1.16.5",
-    "pillow>=10.0.0",
+    "pillow>=13.0.0",
 ]
 
 # Dev group (formerly requirements/dev.txt extras vs publish).
