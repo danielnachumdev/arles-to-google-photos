@@ -35,6 +35,8 @@ jobs:
     with:
       working-directory: services/frontend
       disable-python: true
+      # Prior CI was Node 22 only; default matrix includes 20 where vitest asserts flake.
+      node-versions: '["22"]'
 
   # Aggregate gate → single required check name "CI" (local job, not reusable).
   ci:
