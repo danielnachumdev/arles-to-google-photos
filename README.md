@@ -1,6 +1,9 @@
 # Arles → Google Photos
 
-Turn an old [Arles](https://www.digitaldutch.com/arles/) HTML album into a Google Photos album — same order, titles, journal, and trip dates.
+**Migrate an old [Arles](https://www.digitaldutch.com/arles/) HTML album into Google Photos** — same order, titles, journal, and trip dates.
+
+[![CI](https://github.com/danielnachumdev/arles-to-google-photos/actions/workflows/ci.yml/badge.svg)](https://github.com/danielnachumdev/arles-to-google-photos/actions/workflows/ci.yml)
+[![License: PolyForm Noncommercial 1.0.0](https://img.shields.io/badge/License-PolyForm%20Noncommercial%201.0.0-lightgrey.svg)](./LICENSE)
 
 [Arles Image Web Page Creator](https://www.digitaldutch.com/arles/) (Digital Dutch) builds offline galleries: `index.html`, thumbnails, high-res files, and a page per photo. This app reads a **live gallery URL** (default) or an exported folder, lets you check a preview, and publishes to Google Photos.
 
@@ -73,9 +76,9 @@ How to edit, publish, reprocess, restart, and cancel: [Using the app](docs/using
 
 ## For developers
 
-Local toolchain, tests, and package layout: [docs/development.md](docs/development.md). Internals and API: [AGENTS.md](AGENTS.md).
+Local toolchain, tests, and package layout: [docs/development.md](docs/development.md). Internals, job API, and CI/CD labels: [AGENTS.md](AGENTS.md).
 
-**CI:** GitHub Actions runs backend tests (`uv run pytest`) and frontend tests (`npm test`, `npx tsc -b`) on pull requests and pushes to `main`.
+**CI:** GitHub Actions runs backend (`uv run pytest`) and frontend (`npm test`, `npx tsc -b`) on PRs and pushes to `main`. PRs need **exactly one** semver label (`noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor`).
 
 ## License
 
