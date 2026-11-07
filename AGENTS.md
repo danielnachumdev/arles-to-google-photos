@@ -29,6 +29,7 @@ Do not commit `client_secrets.json` or other secrets. Do not vendor `google-phot
 ```
 .
 ├── .github/
+│   ├── ISSUE_TEMPLATE/      # Feature request + bug report (from danielnachumdev/template)
 │   └── workflows/           # Thin CI/CD orchestrators → danielnachumdev/actions@latest
 ├── services/
 │   ├── backend/
@@ -172,6 +173,7 @@ Preview JSON includes `journal`, `taken_on` (ISO date or null), `last_modified`,
 
 - `.github/CODEOWNERS` — `@danielnachumdev`
 - Branch protection / ruleset: required **`CI`**; code-owner reviews; no force-push to `main`
+- `.github/ISSUE_TEMPLATE/` — feature request (Background / Motivation / Requirements / AC); bug report (Description / Steps to reproduce / Expected / Actual / Environment)
 
 ## Code conventions
 
