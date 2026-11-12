@@ -15,6 +15,13 @@ data/
 venv/
 env/
 
+# CAPA / agent generated (providers write under these; lock stays committed)
+.cursor/
+.claude/
+.codex/
+.windsurf/
+.github/copilot-instructions.md
+
 # IDE / editor
 .idea/
 .vscode/*

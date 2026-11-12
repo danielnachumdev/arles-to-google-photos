@@ -15,6 +15,7 @@ Implementation guide for coding agents changing **arles-to-google-photos**. Prod
 | Python | `>=3.11` (`requires-python` in `services/backend/pyproject.toml`) |
 | Tests | Backend `uv run pytest`; frontend `npm test` + `npx tsc -b` — **never delete** |
 | Secrets | Never commit `client_secrets.json`, API keys, Photos tokens |
+| CAPA | [`capabilities.yaml`](capabilities.yaml) — run `capa install` (do not hand-edit generated `.cursor/` / `.claude/`) |
 
 ## Project overview
 
