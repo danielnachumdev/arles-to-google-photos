@@ -992,6 +992,7 @@ class TestJobsApi(ApiClientSuite):
             "https://www.googleapis.com/auth/photoslibrary.appendonly",
             "https://www.googleapis.com/auth/photoslibrary.sharing",
             "https://www.googleapis.com/auth/photoslibrary.edit.appcreateddata",
+            "https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata",
         ]
 
     def test_auth_config_json_env_without_file(

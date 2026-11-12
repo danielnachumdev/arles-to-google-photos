@@ -22,6 +22,7 @@ Scopes this app requests:
 - `https://www.googleapis.com/auth/photoslibrary.appendonly`
 - `https://www.googleapis.com/auth/photoslibrary.sharing`
 - `https://www.googleapis.com/auth/photoslibrary.edit.appcreateddata`
+- `https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata` (list/search app-created albums/media + `baseUrl`; required for size probes / library validation)
 
 ## 3. Web OAuth client
 
@@ -75,6 +76,8 @@ The UI loads config from `GET /api/auth/config` (`client_id` + scopes only). The
 4. When the upload finishes, open the Google Photos album link.
 
 If the popup is closed or denied, sign-in is cancelled and nothing is uploaded. Use **Settings → Sign out of Google Photos** to clear the saved browser session.
+
+After scopes change (for example adding `readonly.appcreateddata`), clear the browser Google Photos session and sign in again so GIS can request the new scope.
 
 ## What Google Photos receives
 

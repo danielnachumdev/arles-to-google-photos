@@ -9,13 +9,9 @@ from tests.support.suites import OAuthSecretsSuite
 
 class TestGoogleOauthConfig(OAuthSecretsSuite):
     def test_photos_scopes_match_gpsdk(self) -> None:
-        scopes = photos_scope_list()
-        assert scopes == [
-            "https://www.googleapis.com/auth/photoslibrary",
-            "https://www.googleapis.com/auth/photoslibrary.appendonly",
-            "https://www.googleapis.com/auth/photoslibrary.sharing",
-            "https://www.googleapis.com/auth/photoslibrary.edit.appcreateddata",
-        ]
+        from gpsdk.utils.structures.data_types import SCOPES
+
+        assert photos_scope_list() == list(SCOPES)
 
     def test_env_client_id_wins(self) -> None:
         self.write_secrets({"web": {"client_id": "from-file.apps.googleusercontent.com"}})

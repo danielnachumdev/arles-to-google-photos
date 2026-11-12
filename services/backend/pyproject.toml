@@ -6,7 +6,7 @@ requires-python = ">=3.11"
 # Runtime / publish group (formerly requirements/publish.txt).
 # Install with: uv sync
 dependencies = [
-    "google-photos-sdk>=1.0.0",
+    "google-photos-sdk>=1.0.1",
     "beautifulsoup4",
     "tqdm",
     "fastapi",

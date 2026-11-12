@@ -11,6 +11,9 @@ PHOTOS_SCOPES: Tuple[str, ...] = (
     "https://www.googleapis.com/auth/photoslibrary.appendonly",
     "https://www.googleapis.com/auth/photoslibrary.sharing",
     "https://www.googleapis.com/auth/photoslibrary.edit.appcreateddata",
+    # Required to list/search app-created albums/media and receive baseUrl
+    # (Library API 403 without it). Needed for MediaItem.byte_size() / validate.
+    "https://www.googleapis.com/auth/photoslibrary.readonly.appcreateddata",
 )
 
 # Full client_secrets.json text (Secret Manager). Not the file path env.
