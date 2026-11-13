@@ -96,7 +96,11 @@ class RemoteAlbumDiscovery:
                 )
                 fetched = lane.map(
                     [
-                        (lambda url=page_url: self._get_page(url, header_map))
+                        (
+                            lambda url=page_url: self._started_get(
+                                url, header_map, sink=sink
+                            )
+                        )
                         for page_url in wave
                     ]
                 )
@@ -186,6 +190,11 @@ class RemoteAlbumDiscovery:
         def inspect(item: GalleryItemRef) -> RemoteItemSnapshot:
             # Runs inside the lane worker — call HTTP client directly (no nested
             # lane.submit) so we cannot deadlock on the shared worker pool.
+            emit_progress(
+                sink,
+                stage="discover",
+                message=f"Starting remote item {item.item_id}",
+            )
             page_url = urljoin(index_url, item.image_page_href)
             page_html, caption = self._fetch_caption(page_url, headers)
             media_url, size = self._head_media_size(
@@ -244,7 +253,11 @@ class RemoteAlbumDiscovery:
                 break
             fetched = lane.map(
                 [
-                    (lambda url=page_url: self._try_get(url, headers))
+                    (
+                        lambda url=page_url: self._started_try_get(
+                            url, headers, sink=sink
+                        )
+                    )
                     for page_url in wave
                 ]
             )
@@ -330,6 +343,28 @@ class RemoteAlbumDiscovery:
             if size is not None:
                 return url, size
         return None, None
+
+    def _started_get(
+        self,
+        url: str,
+        headers: Mapping[str, str],
+        *,
+        sink: ProgressSink | None,
+    ) -> Tuple[Optional[FetchedResource], Optional[str]]:
+        emit_progress(sink, stage="discover", message=f"Starting fetch {url}")
+        return self._get_page(url, headers)
+
+    def _started_try_get(
+        self,
+        url: str,
+        headers: Mapping[str, str],
+        *,
+        sink: ProgressSink | None,
+    ) -> Optional[FetchedResource]:
+        emit_progress(
+            sink, stage="discover", message=f"Starting index page {url}"
+        )
+        return self._try_get(url, headers)
 
     def _get_page(
         self, url: str, headers: Mapping[str, str]

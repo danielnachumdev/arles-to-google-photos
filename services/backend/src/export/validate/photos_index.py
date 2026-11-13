@@ -107,6 +107,11 @@ class PhotosAlbumIndexer:
         def probe(media: Any) -> PhotosItemSnapshot:
             filename = str(getattr(media, "filename", "") or "")
             item_id = _item_id_from_filename(filename)
+            emit_progress(
+                sink,
+                stage="photos",
+                message=f"Starting Photos size probe {item_id or filename}",
+            )
             caption = str(getattr(media, "description", "") or "").strip()
             size: Optional[int]
             try:
