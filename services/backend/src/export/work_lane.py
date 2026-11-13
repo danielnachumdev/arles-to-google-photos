@@ -91,9 +91,13 @@ class AdaptiveWorkLane(Generic[T]):
     def _execute(self, fn: Callable[[], T]) -> T:
         attempt = 0
         while True:
+            # Wait out shared cooldown without holding a worker slot so the
+            # whole lane idles together after a transient trip.
+            self._wait_cooldown()
             self._acquire_slot()
             try:
-                self._wait_cooldown()
+                if self._cooldown_remaining() > 0:
+                    continue
                 try:
                     result = fn()
                 except BaseException as exc:
@@ -124,11 +128,14 @@ class AdaptiveWorkLane(Generic[T]):
             self._running = max(0, self._running - 1)
             self._lock.notify_all()
 
+    def _cooldown_remaining(self) -> float:
+        with self._lock:
+            return max(0.0, self._paused_until - time.monotonic())
+
     def _wait_cooldown(self) -> None:
         with self._lock:
             while True:
-                now = time.monotonic()
-                remaining = self._paused_until - now
+                remaining = self._paused_until - time.monotonic()
                 if remaining <= 0:
                     return
                 self._lock.wait(timeout=remaining)

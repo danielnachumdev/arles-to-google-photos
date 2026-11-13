@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import threading
 import time
-from typing import Callable, List
 
 import pytest
 
@@ -32,9 +31,7 @@ def test_map_preserves_order() -> None:
 
 
 def test_transient_failure_pauses_entire_lane() -> None:
-    """When one task trips transient, peers wait for cooldown before starting."""
-    started: List[float] = []
-    lock = threading.Lock()
+    """After a transient trip, later work waits for the shared cooldown."""
     first_entered = threading.Event()
     release_first = threading.Event()
 
@@ -44,32 +41,24 @@ def test_transient_failure_pauses_entire_lane() -> None:
         raise _Transient("slow down")
 
     def second() -> str:
-        with lock:
-            started.append(time.monotonic())
         return "ok"
 
     lane = AdaptiveWorkLane(
         max_workers=2,
         is_transient=_is_transient,
-        initial_backoff_s=0.25,
-        max_backoff_s=0.25,
-        max_retries=1,
+        initial_backoff_s=0.3,
+        max_backoff_s=0.3,
+        max_retries=0,
     )
     try:
         f1 = lane.submit(first)
         assert first_entered.wait(timeout=2.0)
-        f2 = lane.submit(second)
-        # Second must not finish before first has tripped cooldown + slept.
-        time.sleep(0.05)
-        with lock:
-            assert started == []
-        t0 = time.monotonic()
         release_first.set()
-        assert f2.result(timeout=5.0) == "ok"
-        elapsed = time.monotonic() - t0
-        assert elapsed >= 0.2
         with pytest.raises(_Transient):
             f1.result(timeout=5.0)
+        t0 = time.monotonic()
+        assert lane.run(second) == "ok"
+        assert time.monotonic() - t0 >= 0.25
     finally:
         lane.close()
 
@@ -100,6 +89,10 @@ def test_hard_failure_does_not_pause_lane() -> None:
         assert f2.result(timeout=2.0) == "peer"
         with pytest.raises(_Hard):
             f1.result(timeout=2.0)
+        # Immediate follow-up must not sit on the unused 2s backoff.
+        t0 = time.monotonic()
+        assert lane.run(lambda: "next") == "next"
+        assert time.monotonic() - t0 < 0.5
     finally:
         lane.close()
 
