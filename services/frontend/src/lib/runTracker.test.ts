@@ -25,9 +25,10 @@ describe('runTracker', () => {
     clearTrackedRuns()
   })
 
-  it('kindFromJobType maps scrape separately from preview and upload', () => {
+  it('kindFromJobType maps scrape and validate separately from preview and upload', () => {
     expect(kindFromJobType('upload')).toBe('upload')
     expect(kindFromJobType('scrape')).toBe('scrape')
+    expect(kindFromJobType('validate')).toBe('validate')
     expect(kindFromJobType('preview')).toBe('preview')
     expect(kindFromJobType(undefined)).toBe('preview')
   })

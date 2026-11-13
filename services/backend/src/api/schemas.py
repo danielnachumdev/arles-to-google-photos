@@ -39,5 +39,11 @@ class ScrapeBody(BaseModel):
     access_token: Optional[str] = None
 
 
+class ValidateBody(BaseModel):
+    url: str
+    headers: Dict[str, str] = Field(default_factory=dict)
+    access_token: str
+
+
 class OrchestratorSettingsBody(BaseModel):
     max_concurrent_jobs: int

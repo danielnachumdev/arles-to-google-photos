@@ -10,6 +10,7 @@ import { JobDetail } from './pages/JobDetail.tsx'
 import { JobList } from './pages/JobList.tsx'
 import { NotFoundPage } from './pages/NotFoundPage.tsx'
 import { SettingsPage } from './pages/SettingsPage.tsx'
+import { ValidatePage } from './pages/ValidatePage.tsx'
 import { AppProviders } from './providers/AppProviders.tsx'
 
 function HomePage() {
@@ -72,6 +73,7 @@ function App() {
             <Route path="/albums/:jobId" element={<AlbumPage />} />
             <Route path="/jobs" element={<JobList />} />
             <Route path="/jobs/:jobId" element={<JobPage />} />
+            <Route path="/validate" element={<ValidatePage />} />
             <Route path="/settings" element={<SettingsPage />} />
             <Route path="*" element={<NotFoundPage />} />
           </Routes>

@@ -28,6 +28,7 @@ STATUS_CANCELLED = "cancelled"
 TYPE_PREVIEW = "preview"
 TYPE_UPLOAD = "upload"
 TYPE_SCRAPE = "scrape"
+TYPE_VALIDATE = "validate"
 _TERMINAL_STATUSES = frozenset({STATUS_DONE, STATUS_FAILED, STATUS_CANCELLED})
 _ACTIVE_STATUSES = frozenset({STATUS_PENDING, STATUS_RUNNING, STATUS_WAITING})
 _VALID_STATUSES = frozenset(
@@ -40,7 +41,9 @@ _VALID_STATUSES = frozenset(
         STATUS_CANCELLED,
     }
 )
-_VALID_TYPES = frozenset({TYPE_PREVIEW, TYPE_UPLOAD, TYPE_SCRAPE})
+_VALID_TYPES = frozenset(
+    {TYPE_PREVIEW, TYPE_UPLOAD, TYPE_SCRAPE, TYPE_VALIDATE}
+)
 _LEGACY_STATUS_MAP = {
     "created": (STATUS_PENDING, TYPE_PREVIEW),
     "ingesting": (STATUS_RUNNING, TYPE_PREVIEW),
@@ -385,7 +388,7 @@ def job_to_dict(
 ) -> Dict[str, Any]:
     header_names = list((job.scrape_headers or {}).keys())
     updated_at, finished_at, duration_seconds, last_stage = _summary_timing(job)
-    return {
+    payload: Dict[str, Any] = {
         "id": job.id,
         "number": job.number,
         "status": job.status,
@@ -420,6 +423,19 @@ def job_to_dict(
             scrape_url=job.scrape_url,
         ),
     }
+    report = _validation_report_from_extra(job.extra)
+    if report is not None:
+        payload["validation_report"] = report
+    return payload
+
+
+def _validation_report_from_extra(
+    extra: Optional[Dict[str, Any]],
+) -> Optional[Dict[str, Any]]:
+    if not isinstance(extra, dict):
+        return None
+    report = extra.get("validation_report")
+    return report if isinstance(report, dict) else None
 
 
 def album_identity_key(title: Optional[str]) -> Optional[str]:
@@ -441,7 +457,7 @@ def job_album_key(job: Job) -> Optional[str]:
 
 
 def job_display_title(job: Job) -> Optional[str]:
-    if job.type == TYPE_SCRAPE:
+    if job.type in {TYPE_SCRAPE, TYPE_VALIDATE}:
         return None
     if job.preview is not None:
         stripped = str(job.preview.title or "").strip()
@@ -452,7 +468,7 @@ def job_display_title(job: Job) -> Optional[str]:
 
 def _is_library_album(job: Job) -> bool:
     """True when the job can be opened on the album desk (saved preview)."""
-    if job.type == TYPE_SCRAPE:
+    if job.type in {TYPE_SCRAPE, TYPE_VALIDATE}:
         return False
     if job.preview is None:
         return False

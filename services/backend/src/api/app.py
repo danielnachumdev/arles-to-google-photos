@@ -24,6 +24,7 @@ from ..jobs.scrape import ScrapeService
 from ..jobs.scraper import load_default_scraper
 from ..jobs.store import JobStore
 from ..jobs.tokens import AccessTokenVault
+from ..jobs.validate import ValidateService
 from ..jobs.workspace import JobWorkspace
 from .deps import ApiDependencies
 from ..version import __version__
@@ -34,6 +35,7 @@ from .routers import (
     publish_router,
     scrape_router,
     settings_router,
+    validate_router,
     version_router,
 )
 
@@ -131,6 +133,14 @@ def create_app(
         submit=orchestrator.submit,
         auto_publisher=auto_publisher,
     )
+    validate = ValidateService(
+        store=store,
+        events=events,
+        gp_factory=gp_factory or _default_gp_factory,
+        jobs_root=root,
+        vault=AccessTokenVault(),
+        submit=orchestrator.submit,
+    )
 
     app = FastAPI(title="Arles Migrator", version=__version__)
     app.add_middleware(
@@ -152,8 +162,10 @@ def create_app(
         events=events,
         jobs_root=root,
         orchestrator=orchestrator,
+        validate=validate,
     )
     app.include_router(scrape_router)
+    app.include_router(validate_router)
     app.include_router(jobs_router)
     app.include_router(publish_router)
     app.include_router(events_router)

@@ -76,6 +76,8 @@ export function jobTypeLabel(jobType: string): string {
       return t.typeUpload
     case 'scrape':
       return t.typeScrape
+    case 'validate':
+      return t.typeValidate
     default:
       return jobType
   }

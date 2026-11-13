@@ -1,6 +1,44 @@
 export type JobStatus = 'pending' | 'running' | 'waiting' | 'done' | 'failed' | 'cancelled'
 
-export type JobType = 'preview' | 'upload' | 'scrape'
+export type JobType = 'preview' | 'upload' | 'scrape' | 'validate'
+
+export type ValidationItemMismatch = {
+  item_id: string
+  field: string
+  remote?: unknown
+  photos?: unknown
+}
+
+export type ValidationMatchedAlbum = {
+  title_id: string
+  title: string
+  remote_url: string
+  photos_album_id: string
+  photos_product_url: string
+  identical: boolean
+  only_remote_items?: string[]
+  only_photos_items?: string[]
+  mismatches?: ValidationItemMismatch[]
+}
+
+export type ValidationSideAlbum = {
+  title_id: string
+  title: string
+  item_count: number
+  url?: string | null
+  album_id?: string | null
+  product_url?: string | null
+}
+
+export type ValidationReport = {
+  root_url: string
+  identical: boolean
+  summary: Record<string, number>
+  warnings?: string[]
+  matched?: ValidationMatchedAlbum[]
+  only_remote?: ValidationSideAlbum[]
+  only_photos?: ValidationSideAlbum[]
+}
 
 export type ImportOrigin = 'folder' | 'web'
 
@@ -83,6 +121,7 @@ export type Job = {
   user_edited?: boolean
   import_origin?: ImportOrigin | null
   archived_at?: string | null
+  validation_report?: ValidationReport | null
 }
 
 export type ScrapeJobRequest = {
@@ -90,6 +129,12 @@ export type ScrapeJobRequest = {
   headers?: Record<string, string>
   auto_publish?: boolean
   access_token?: string
+}
+
+export type ValidateJobRequest = {
+  url: string
+  headers?: Record<string, string>
+  access_token: string
 }
 
 export type JobChildrenResponse = {

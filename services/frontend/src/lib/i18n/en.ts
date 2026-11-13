@@ -11,6 +11,7 @@ export const en: MessageCatalog = {
   navHome: 'New',
   navAlbums: 'Saved albums',
   navJobs: 'Jobs',
+  navValidate: 'Validate',
   navSettings: 'Settings',
   openAlbumLibrary: 'Open saved albums',
   backToAlbums: 'Back to saved albums',
@@ -186,6 +187,32 @@ export const en: MessageCatalog = {
   typePreview: 'Prepare preview',
   typeUpload: 'Publish to Photos',
   typeScrape: 'Web import',
+  typeValidate: 'Validate vs Photos',
+
+  validateHeading: 'Validate remote vs Photos',
+  validateLede:
+    'Compare an Arles gallery URL (and its child albums) to app-created Google Photos albums by title, captions, and file size. Does not download photos into this app.',
+  validateStart: 'Start validation',
+  validateStarting: 'Starting…',
+  validateNeedsSignIn: 'Sign in to Google Photos to read app-created albums.',
+  errorValidate: (detail) => `Validation failed. ${detail}`,
+  validationReportHeading: 'Validation report',
+  validationIdentical: 'Remote tree matches app-created Photos albums.',
+  validationDifferences: 'Differences found between remote and Photos.',
+  validationSummaryMatched: (n) => `${n} matched by title`,
+  validationSummaryOnlyRemote: (n) => `${n} only on remote`,
+  validationSummaryOnlyPhotos: (n) => `${n} only in Photos`,
+  validationSummaryMismatches: (n) => `${n} with content differences`,
+  validationMatchedHeading: 'Matched albums',
+  validationOnlyRemoteHeading: 'Only on remote',
+  validationOnlyPhotosHeading: 'Only in Photos',
+  validationAlbumIdentical: 'Identical',
+  validationAlbumDiff: 'Differences',
+  validationItemOnlyRemote: 'Only remote',
+  validationItemOnlyPhotos: 'Only Photos',
+  validationMismatchCaption: 'Caption',
+  validationMismatchSize: 'Size',
+  validationMismatchSizeUnavailable: 'Size unavailable',
 
   importModeAria: 'Import source',
   importModeUpload: 'Upload an exported album folder',
@@ -325,12 +352,15 @@ export const en: MessageCatalog = {
   toastPreviewDone: (jobLabel) => `Preview is ready. ${jobLabel}`,
   toastUploadDone: (jobLabel) => `Upload finished. ${jobLabel}`,
   toastScrapeDone: (jobLabel) => `Web import finished. ${jobLabel}`,
+  toastValidateDone: (jobLabel) => `Validation finished. ${jobLabel}`,
   toastPreviewFailed: (jobLabel, detail) =>
     detail ? `Preview failed. ${jobLabel}. ${detail}` : `Preview failed. ${jobLabel}`,
   toastUploadFailed: (jobLabel, detail) =>
     detail ? `Upload failed. ${jobLabel}. ${detail}` : `Upload failed. ${jobLabel}`,
   toastScrapeFailed: (jobLabel, detail) =>
     detail ? `Web import failed. ${jobLabel}. ${detail}` : `Web import failed. ${jobLabel}`,
+  toastValidateFailed: (jobLabel, detail) =>
+    detail ? `Validation failed. ${jobLabel}. ${detail}` : `Validation failed. ${jobLabel}`,
   toastRunCancelled: 'Run cancelled.',
   toastRunCancelledJob: (jobLabel) => `Run cancelled. ${jobLabel}`,
 

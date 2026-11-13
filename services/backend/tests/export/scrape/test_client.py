@@ -43,6 +43,21 @@ class _HeaderProbeHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def do_HEAD(self) -> None:
+        headers = {key.lower(): value for key, value in self.headers.items()}
+        _HeaderProbeHandler.seen.append((self.path, headers))
+        cookie = headers.get("cookie", "")
+        auth = headers.get("authorization", "")
+        if cookie != self.cookie_ok or auth != self.auth_ok:
+            self.send_response(403)
+            self.end_headers()
+            return
+        body = b"<html><body>ok</body></html>"
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.end_headers()
+
     def log_message(self, _format: str, *args: object) -> None:
         return
 
@@ -91,6 +106,15 @@ class TestUrllibHttpClient:
 
         assert result.status_code == 404
         assert result.content == b"nope"
+
+    def test_head_returns_content_length_without_body(self) -> None:
+        result = self.http.head(f"{self.base}/Day1/index.html", self.auth_headers)
+
+        assert result.status_code == 200
+        assert result.content == b""
+        assert result.headers.get("content-length") == str(
+            len(b"<html><body>ok</body></html>")
+        )
 
 
 class TestHttpClientHelpers:

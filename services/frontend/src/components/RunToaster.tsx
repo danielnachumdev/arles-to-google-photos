@@ -33,6 +33,9 @@ function doneMessage(kind: TrackedRun['kind'], jobLabel: string): string {
   if (kind === 'scrape') {
     return t.toastScrapeDone(jobLabel)
   }
+  if (kind === 'validate') {
+    return t.toastValidateDone(jobLabel)
+  }
   return t.toastPreviewDone(jobLabel)
 }
 
@@ -52,6 +55,9 @@ function failedMessage(
   }
   if (kind === 'scrape') {
     return t.toastScrapeFailed(jobLabel, jobErrorMessage({ ...job, type: 'scrape' }))
+  }
+  if (kind === 'validate') {
+    return t.toastValidateFailed(jobLabel, (job.error ?? '').trim())
   }
   return t.toastPreviewFailed(jobLabel, (job.error ?? '').trim())
 }

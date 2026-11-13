@@ -26,6 +26,9 @@ class HttpClient(Protocol):
     def get(self, url: str, headers: Mapping[str, str]) -> FetchedResource:
         """GET ``url``. HTTP errors are returned as status_code, not raised."""
 
+    def head(self, url: str, headers: Mapping[str, str]) -> FetchedResource:
+        """HEAD ``url``. HTTP errors are returned as status_code, not raised."""
+
 
 def merge_headers(extra: Mapping[str, str]) -> Dict[str, str]:
     """Default UA/Accept, then extra headers (extra wins, including UA)."""
@@ -49,10 +52,23 @@ class UrllibHttpClient:
         self._timeout = timeout
 
     def get(self, url: str, headers: Mapping[str, str]) -> FetchedResource:
-        request = Request(url, headers=merge_headers(headers), method="GET")
+        return self._request(url, headers, method="GET", read_body=True)
+
+    def head(self, url: str, headers: Mapping[str, str]) -> FetchedResource:
+        return self._request(url, headers, method="HEAD", read_body=False)
+
+    def _request(
+        self,
+        url: str,
+        headers: Mapping[str, str],
+        *,
+        method: str,
+        read_body: bool,
+    ) -> FetchedResource:
+        request = Request(url, headers=merge_headers(headers), method=method)
         try:
             with urlopen(request, timeout=self._timeout) as response:
-                content = response.read()
+                content = response.read() if read_body else b""
                 status = int(getattr(response, "status", 200))
                 final_url = str(response.geturl() or url)
                 raw_headers = {
@@ -66,7 +82,9 @@ class UrllibHttpClient:
                     content=content,
                 )
         except HTTPError as exc:
-            body = exc.read() if exc.fp is not None else b""
+            body = b""
+            if read_body and exc.fp is not None:
+                body = exc.read()
             raw_headers = {
                 str(key).lower(): str(value)
                 for key, value in (exc.headers or {}).items()

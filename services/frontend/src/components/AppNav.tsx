@@ -76,6 +76,15 @@ export function AppNav() {
           {t.navJobs}
         </NavLink>
         <NavLink
+          to="/validate"
+          end
+          className={({ isActive }) =>
+            isActive ? 'app-nav__link app-nav__link--active' : 'app-nav__link'
+          }
+        >
+          {t.navValidate}
+        </NavLink>
+        <NavLink
           to="/settings"
           end
           className={({ isActive }) =>

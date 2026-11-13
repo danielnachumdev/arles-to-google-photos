@@ -2,7 +2,7 @@ import type { JobEvent } from './types.ts'
 
 export type { JobEvent }
 
-export type EventPhase = 'ingest' | 'publish' | 'history' | 'scrape'
+export type EventPhase = 'ingest' | 'publish' | 'history' | 'scrape' | 'validate'
 
 export class JobEventSource {
   subscribe(

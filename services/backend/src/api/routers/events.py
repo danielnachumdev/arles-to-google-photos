@@ -31,7 +31,7 @@ def job_events(
     require_job(deps.store, job_id, owner_id=user.id)
     queue = deps.events.subscribe(job_id)
     terminal = set(_EVENT_STAGE_TERMINALS)
-    if phase not in {"publish", "scrape"}:
+    if phase not in {"publish", "scrape", "validate"}:
         terminal.add("preview_ready")
 
     async def stream() -> AsyncIterator[str]:
