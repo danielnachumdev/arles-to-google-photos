@@ -35,12 +35,16 @@ Click a thumbnail to open a larger preview. **Videos** play in the same dialog (
 
 **Publish again** creates another independent Photos album. It does not overwrite the previous one.
 
+## Validate vs Photos
+
+**Validate** (`/validate`) compares a remote Arles gallery URL (BFS over hubs/parents/leaves) to **app-created** Google Photos albums. Matching is by gallery title; items pair by id/filename, then caption and byte size. It does **not** download photos into this app or publish anything. Sign in to Google Photos, start the job, then open the report on the job detail page when it finishes. Personal / non-app Photos albums are out of scope.
+
 ## Saved albums vs Jobs
 
 | Page | What it is |
 |------|------------|
 | **Saved albums** | One card per **gallery title** already imported on this server. Not the live website, and not every historical run. Hide/archive on Jobs does **not** remove the card. |
-| **Jobs** | Every non-archived run: web scrape, folder preview, and publish. Use this for progress, logs, cancel, restart, and hide. |
+| **Jobs** | Every non-archived run: web scrape, folder preview, publish, and validate. Use this for progress, logs, cancel, restart, and hide. |
 
 After Docker or the API restarts, reopen galleries from **Saved albums**.
 

@@ -21,6 +21,7 @@ from ..jobs.reprocess import ReprocessService
 from ..jobs.restart import RestartService
 from ..jobs.scrape import ScrapeService
 from ..jobs.store import Job, JobNotFoundError, JobStore
+from ..jobs.validate import ValidateService
 
 
 @dataclass(frozen=True)
@@ -36,6 +37,7 @@ class ApiDependencies:
     events: JobEventBus
     jobs_root: Path
     orchestrator: JobOrchestrator
+    validate: Optional[ValidateService] = None
 
 
 def get_deps(request: Request) -> ApiDependencies:

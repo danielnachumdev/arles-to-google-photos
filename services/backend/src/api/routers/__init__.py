@@ -4,6 +4,7 @@ from .jobs import router as jobs_router
 from .publish import router as publish_router
 from .scrape import router as scrape_router
 from .settings import router as settings_router
+from .validate import router as validate_router
 from .version import router as version_router
 
 __all__ = [
@@ -13,5 +14,6 @@ __all__ = [
     "publish_router",
     "scrape_router",
     "settings_router",
+    "validate_router",
     "version_router",
 ]

@@ -15,6 +15,7 @@ export type MessageCatalog = {
   navHome: string
   navAlbums: string
   navJobs: string
+  navValidate: string
   navSettings: string
   openAlbumLibrary: string
   backToAlbums: string
@@ -144,6 +145,31 @@ export type MessageCatalog = {
   typePreview: string
   typeUpload: string
   typeScrape: string
+  typeValidate: string
+
+  validateHeading: string
+  validateLede: string
+  validateStart: string
+  validateStarting: string
+  validateNeedsSignIn: string
+  errorValidate: (detail: string) => string
+  validationReportHeading: string
+  validationIdentical: string
+  validationDifferences: string
+  validationSummaryMatched: (n: number) => string
+  validationSummaryOnlyRemote: (n: number) => string
+  validationSummaryOnlyPhotos: (n: number) => string
+  validationSummaryMismatches: (n: number) => string
+  validationMatchedHeading: string
+  validationOnlyRemoteHeading: string
+  validationOnlyPhotosHeading: string
+  validationAlbumIdentical: string
+  validationAlbumDiff: string
+  validationItemOnlyRemote: string
+  validationItemOnlyPhotos: string
+  validationMismatchCaption: string
+  validationMismatchSize: string
+  validationMismatchSizeUnavailable: string
 
   importModeAria: string
   importModeUpload: string
@@ -259,9 +285,11 @@ export type MessageCatalog = {
   toastPreviewDone: (jobLabel: string) => string
   toastUploadDone: (jobLabel: string) => string
   toastScrapeDone: (jobLabel: string) => string
+  toastValidateDone: (jobLabel: string) => string
   toastPreviewFailed: (jobLabel: string, detail: string) => string
   toastUploadFailed: (jobLabel: string, detail: string) => string
   toastScrapeFailed: (jobLabel: string, detail: string) => string
+  toastValidateFailed: (jobLabel: string, detail: string) => string
   toastRunCancelled: string
   toastRunCancelledJob: (jobLabel: string) => string
 

@@ -2,7 +2,7 @@ import type { JobStatus } from '../api/types.ts'
 import { t } from './language.ts'
 import { toast } from './toast.ts'
 
-export type TrackedRunKind = 'preview' | 'upload' | 'scrape'
+export type TrackedRunKind = 'preview' | 'upload' | 'scrape' | 'validate'
 
 export type TrackedRun = {
   id: string
@@ -66,6 +66,9 @@ export function kindFromJobType(jobType: string | null | undefined): TrackedRunK
   }
   if (jobType === 'scrape') {
     return 'scrape'
+  }
+  if (jobType === 'validate') {
+    return 'validate'
   }
   return 'preview'
 }

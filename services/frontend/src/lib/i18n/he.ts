@@ -11,6 +11,7 @@ export const he: MessageCatalog = {
   navHome: 'חדש',
   navAlbums: 'אלבומים שמורים',
   navJobs: 'הרצות',
+  navValidate: 'אימות',
   navSettings: 'הגדרות',
   openAlbumLibrary: 'פתיחת אלבומים שמורים',
   backToAlbums: 'חזרה לאלבומים שמורים',
@@ -181,6 +182,32 @@ export const he: MessageCatalog = {
   typePreview: 'הכנת תצוגה',
   typeUpload: 'פרסום ל-Photos',
   typeScrape: 'ייבוא מהרשת',
+  typeValidate: 'אימות מול Photos',
+
+  validateHeading: 'אימות מרחוק מול Photos',
+  validateLede:
+    'השוו כתובת גלריית Arles (ואלבומי המשנה שלה) לאלבומי Google Photos שנוצרו באפליקציה — לפי כותרת, כיתובים וגודל קובץ. לא מורידים תמונות לאפליקציה.',
+  validateStart: 'התחלת אימות',
+  validateStarting: 'מתחיל…',
+  validateNeedsSignIn: 'התחברו ל-Google Photos כדי לקרוא אלבומים שנוצרו באפליקציה.',
+  errorValidate: (detail) => `האימות נכשל. ${detail}`,
+  validationReportHeading: 'דוח אימות',
+  validationIdentical: 'העץ המרוחק תואם לאלבומי Photos שנוצרו באפליקציה.',
+  validationDifferences: 'נמצאו הבדלים בין המרוחק ל-Photos.',
+  validationSummaryMatched: (n) => `${n} תואמים לפי כותרת`,
+  validationSummaryOnlyRemote: (n) => `${n} רק במרוחק`,
+  validationSummaryOnlyPhotos: (n) => `${n} רק ב-Photos`,
+  validationSummaryMismatches: (n) => `${n} עם הבדלי תוכן`,
+  validationMatchedHeading: 'אלבומים תואמים',
+  validationOnlyRemoteHeading: 'רק במרוחק',
+  validationOnlyPhotosHeading: 'רק ב-Photos',
+  validationAlbumIdentical: 'זהה',
+  validationAlbumDiff: 'הבדלים',
+  validationItemOnlyRemote: 'רק מרוחק',
+  validationItemOnlyPhotos: 'רק Photos',
+  validationMismatchCaption: 'כיתוב',
+  validationMismatchSize: 'גודל',
+  validationMismatchSizeUnavailable: 'גודל לא זמין',
 
   importModeAria: 'אופן ייבוא',
   importModeUpload: 'העלאת תיקיית אלבום מיוצאת',
@@ -318,12 +345,15 @@ export const he: MessageCatalog = {
   toastPreviewDone: (jobLabel) => `התצוגה המקדימה מוכנה. ${jobLabel}`,
   toastUploadDone: (jobLabel) => `ההעלאה הושלמה. ${jobLabel}`,
   toastScrapeDone: (jobLabel) => `האיסוף מהרשת הושלם. ${jobLabel}`,
+  toastValidateDone: (jobLabel) => `האימות הושלם. ${jobLabel}`,
   toastPreviewFailed: (jobLabel, detail) =>
     detail ? `הכנת התצוגה המקדימה נכשלה. ${jobLabel}. ${detail}` : `הכנת התצוגה המקדימה נכשלה. ${jobLabel}`,
   toastUploadFailed: (jobLabel, detail) =>
     detail ? `ההעלאה נכשלה. ${jobLabel}. ${detail}` : `ההעלאה נכשלה. ${jobLabel}`,
   toastScrapeFailed: (jobLabel, detail) =>
     detail ? `האיסוף מהרשת נכשל. ${jobLabel}. ${detail}` : `האיסוף מהרשת נכשל. ${jobLabel}`,
+  toastValidateFailed: (jobLabel, detail) =>
+    detail ? `האימות נכשל. ${jobLabel}. ${detail}` : `האימות נכשל. ${jobLabel}`,
   toastRunCancelled: 'ההרצה בוטלה.',
   toastRunCancelledJob: (jobLabel) => `ההרצה בוטלה. ${jobLabel}`,
 

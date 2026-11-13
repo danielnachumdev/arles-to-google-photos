@@ -1,0 +1,59 @@
+.validation-report {
+  padding-block: 1.15rem 1.25rem;
+  padding-inline: 1.15rem;
+  background: color-mix(in srgb, var(--surface) 86%, transparent);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-panel);
+  box-shadow: var(--shadow-lamp);
+  font-family: var(--font-ui);
+}
+
+.validation-report__heading {
+  margin: 0 0 0.55rem;
+  font-family: var(--font-display);
+  font-size: 1.2rem;
+  font-weight: 600;
+  letter-spacing: -0.04em;
+}
+
+.validation-report__verdict {
+  margin: 0 0 0.75rem;
+  font-weight: 600;
+}
+
+.validation-report__verdict--ok {
+  color: var(--color-ok, #1a7a3c);
+}
+
+.validation-report__verdict--diff {
+  color: var(--color-warn, #9a5b00);
+}
+
+.validation-report__summary,
+.validation-report__warnings,
+.validation-report__albums,
+.validation-report__details {
+  margin: 0 0 0.85rem;
+  padding-inline-start: 1.2rem;
+}
+
+.validation-report__section {
+  margin-block-start: 0.85rem;
+}
+
+.validation-report__subheading {
+  margin: 0 0 0.4rem;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.validation-report__album {
+  margin-block-end: 0.55rem;
+}
+
+.validation-report__album-title {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: baseline;
+}

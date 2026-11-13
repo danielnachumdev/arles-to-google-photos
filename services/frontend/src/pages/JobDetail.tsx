@@ -8,6 +8,7 @@ import { CancelJobDialog } from '../components/CancelJobDialog.tsx'
 import { RestartJobDialog } from '../components/RestartJobDialog.tsx'
 import { JobStatusBadge } from '../components/JobStatusBadge.tsx'
 import { LoadingSpinner } from '../components/LoadingSpinner.tsx'
+import { ValidationReportView } from '../components/ValidationReport.tsx'
 import { GoogleAuthCancelledError } from '../lib/googleAuth.ts'
 import { withGooglePhotosAccessToken } from '../lib/withGooglePhotosToken.ts'
 import { formatJobDate } from '../lib/formatJobDate.ts'
@@ -250,7 +251,8 @@ export function JobDetail({ jobId }: { jobId: string }) {
     (job != null && isJobActive(job.status)) ||
     children.some((child) => child.status != null && isJobActive(child.status))
   const cancellable = job != null && isJobCancellable(job.status)
-  const restartable = job != null && job.status === 'cancelled'
+  const restartable =
+    job != null && job.status === 'cancelled' && job.type !== 'validate'
 
   async function confirmRestart(mode: RestartMode) {
     if (!job || restarting) {
@@ -397,7 +399,7 @@ export function JobDetail({ jobId }: { jobId: string }) {
                 ) : null}
               </span>
             </Field>
-            {job.type === 'scrape' ? (
+            {job.type === 'scrape' || job.type === 'validate' ? (
               <>
                 {scrapeUrl ? (
                   <Field label={t.jobUrlLabel}>
@@ -509,6 +511,10 @@ export function JobDetail({ jobId }: { jobId: string }) {
           </dl>
         ) : null}
       </div>
+
+      {job?.validation_report ? (
+        <ValidationReportView report={job.validation_report} />
+      ) : null}
 
       {children.length > 0 ? (
         <div className="job-detail__stage">

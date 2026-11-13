@@ -15,6 +15,7 @@ import type {
   OrchestratorSettings,
   ReprocessOptions,
   ScrapeJobRequest,
+  ValidateJobRequest,
 } from './types.ts'
 import { apiErrorFromHttp } from '../lib/formatApiError.ts'
 import {
@@ -152,6 +153,23 @@ export class MigrationClient {
     }
     return this.readJob(
       await fetch(`${this.baseUrl}/jobs/scrape`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }),
+    )
+  }
+
+  async createValidateJob(input: ValidateJobRequest): Promise<Job> {
+    const body: ValidateJobRequest = {
+      url: input.url,
+      access_token: input.access_token,
+    }
+    if (input.headers && Object.keys(input.headers).length > 0) {
+      body.headers = input.headers
+    }
+    return this.readJob(
+      await fetch(`${this.baseUrl}/jobs/validate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),
