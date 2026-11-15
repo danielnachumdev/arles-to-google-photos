@@ -25,7 +25,9 @@ class _FakeDiscovery:
         *,
         headers: Optional[Dict[str, str]] = None,
         sink: Any = None,
+        overall: Any = None,
     ) -> Tuple[List[RemoteAlbumSnapshot], List[str]]:
+        del overall
         return (
             [
                 RemoteAlbumSnapshot(
@@ -45,8 +47,9 @@ class _FakeDiscovery:
 
 class _FakePhotos:
     def index(
-        self, gp: Any, *, sink: Any = None
+        self, gp: Any, *, sink: Any = None, overall: Any = None
     ) -> Tuple[List[PhotosAlbumSnapshot], List[str]]:
+        del overall
         return (
             [
                 PhotosAlbumSnapshot(
