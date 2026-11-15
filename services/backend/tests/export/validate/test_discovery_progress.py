@@ -1,11 +1,10 @@
-"""Validate discovery emits sparse UI logs and monotonic overall progress."""
+"""Validate discovery emits sparse UI logs without sticky counters."""
 from __future__ import annotations
 
 from typing import Dict, Mapping
 
 from src.export.scrape.client import FetchedResource
 from src.export.validate.discovery import RemoteAlbumDiscovery
-from src.progress import OverallProgress
 from tests.support.fakes.sinks import RecordingSink
 
 _HUB_HTML = b"""<!DOCTYPE html><html><body>
@@ -53,7 +52,7 @@ class _MapClient:
         )
 
 
-def test_discovery_overall_progress_is_monotonic() -> None:
+def test_discovery_ui_logs_have_no_resetting_counters() -> None:
     root = "https://example.com/album/index2001.html"
     leaf = "https://example.com/album/2001/0401_1/index.html"
     leaf2 = "https://example.com/album/2001/0501_1/index.html"
@@ -69,9 +68,8 @@ def test_discovery_overall_progress_is_monotonic() -> None:
         "https://example.com/album/2001/0501_1/hrimages/0401_1_01hr.JPG": b"JPEGDATA",
     }
     sink = RecordingSink()
-    overall = OverallProgress(sink, message="Validating…", interval_s=0.0)
     albums, _warnings = RemoteAlbumDiscovery(_MapClient(pages)).discover(
-        root, sink=sink, overall=overall
+        root, sink=sink
     )
     assert len(albums) == 2
 
@@ -79,16 +77,9 @@ def test_discovery_overall_progress_is_monotonic() -> None:
     assert any("Fetching" in message and "gallery page" in message for message in ui_messages)
     assert any(message.startswith("Remote album ") for message in ui_messages)
     assert not any(message.startswith("Starting ") for message in ui_messages)
-    # Milestone logs must not carry resetting counters into the sticky channel.
+    # Milestone logs must not carry counters into the sticky channel.
     assert all(total == 0 for _stage, _message, _current, total in sink.events)
-
-    progress = sink.progress_events
-    assert progress
-    totals = [total for _stage, _message, _current, total in progress]
-    currents = [current for _stage, _message, current, _total in progress]
-    assert totals == sorted(totals)
-    assert currents == sorted(currents)
-    assert currents[-1] == totals[-1] > 0
+    assert sink.progress_events == []
 
     ops_messages = [message for _stage, message, _c, _t in sink.ops_events]
     assert any(message.startswith("Starting fetch ") for message in ops_messages)

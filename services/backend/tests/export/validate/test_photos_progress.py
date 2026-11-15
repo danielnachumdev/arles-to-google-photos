@@ -1,11 +1,10 @@
-"""Photos indexer emits ops start lines and monotonic overall size-probe progress."""
+"""Photos indexer emits ops start lines without sticky counters."""
 from __future__ import annotations
 
 from typing import Any, List
 
 from src.export.validate.photos_index import PhotosAlbumIndexer
 from src.export.work_lane import AdaptiveWorkLane
-from src.progress import OverallProgress
 from tests.support.fakes.sinks import RecordingSink
 
 
@@ -38,9 +37,8 @@ class _FakeAlbum:
     title = "7-Apr-2001: Passover night"
 
 
-def test_photos_album_items_overall_progress_is_monotonic() -> None:
+def test_photos_album_items_ops_without_sticky_progress() -> None:
     sink = RecordingSink()
-    overall = OverallProgress(sink, message="Validating…", interval_s=0.0)
     indexer = PhotosAlbumIndexer()
     with AdaptiveWorkLane(max_workers=2) as lane:
         items = indexer._album_items(
@@ -50,16 +48,11 @@ def test_photos_album_items_overall_progress_is_monotonic() -> None:
             sink=sink,
             warnings=[],
             lane=lane,
-            overall=overall,
         )
     assert len(items) == 3
 
     assert all(total == 0 for _stage, _message, _current, total in sink.events)
-    progress = sink.progress_events
-    assert progress
-    assert progress[-1][2:] == (3, 3)
-    currents = [current for _stage, _message, current, _total in progress]
-    assert currents == sorted(currents)
+    assert sink.progress_events == []
 
     ops_starts = [
         message

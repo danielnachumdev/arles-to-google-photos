@@ -328,15 +328,21 @@
 
 .job-detail__child {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.35rem 0.7rem;
+  flex-direction: column;
+  gap: 0.4rem;
   padding-block: 0.5rem;
   padding-inline: 0.65rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-panel);
   background: var(--surface);
   text-align: start;
+}
+
+.job-detail__child-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.7rem;
 }
 
 .job-detail__child-id {
@@ -347,4 +353,29 @@
 .job-detail__child-title {
   font-family: var(--font-ui);
   color: var(--color-ink);
+}
+
+.job-detail__child-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 100%;
+}
+
+.job-detail__child-progress-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 0.65rem;
+}
+
+.job-detail__child-progress-message {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--color-rail);
+}
+
+.job-detail__progress-bar--child {
+  height: 0.35rem;
 }

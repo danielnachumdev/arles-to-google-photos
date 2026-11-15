@@ -263,6 +263,62 @@ class TestScrapeService(ScrapeServiceSuite):
             for job in store.list()
         )
 
+    def test_hub_emits_child_count_progress_while_waiting(
+        self,
+        tmp_path: Path,
+    ) -> None:
+        child_a = "https://albums.example/day-a"
+        child_b = "https://albums.example/day-b"
+        fake = FakeAlbumScraper(
+            files=[],
+            gallery_urls=[child_a, child_b],
+            by_url={
+                child_a: FakeAlbumScraper(files=mini_album_files()),
+                child_b: FakeAlbumScraper(files=mini_album_files()),
+            },
+        )
+        store = JobStore.load(tmp_path)
+        bus = JobEventBus(persist=store.append_event)
+        deferred: list[tuple[str, object]] = []
+
+        def submit(job_id: str, fn: object) -> None:
+            deferred.append((job_id, fn))
+
+        service = ScrapeService(
+            store=store,
+            scraper=fake,
+            parser=AlbumExportParser(),
+            events=bus,
+            workspace=JobWorkspace,
+            jobs_root=tmp_path,
+            submit=submit,
+        )
+        parent_id = service.start("https://albums.example/hub")
+        service.finish(parent_id)
+
+        parent = store.get(parent_id)
+        assert parent.status == "waiting"
+        progress = [event for event in parent.events if event.kind == "progress"]
+        assert progress
+        assert progress[-1].current == 0
+        assert progress[-1].total == 2
+        assert "Waiting on child albums" in progress[-1].message
+
+        # Finish one child → orchestrator-style parent refresh via settle helper.
+        from src.jobs.orchestrator import JobOrchestrator
+
+        orch = JobOrchestrator(store, events=bus, max_concurrent=2)
+        for job_id, fn in deferred:
+            assert callable(fn)
+            fn()  # type: ignore[operator]
+            orch.on_child_settled(job_id)
+
+        parent = store.get(parent_id)
+        progress = [event for event in parent.events if event.kind == "progress"]
+        assert progress[-1].current == 2
+        assert progress[-1].total == 2
+        assert parent.status == "done"
+
     def test_scrape_failure_marks_failed_and_emits_error(self, tmp_path: Path) -> None:
         fake = FakeAlbumScraper(error=RuntimeError("site down"))
         service, store, _, _ = _service(tmp_path, scraper=fake)

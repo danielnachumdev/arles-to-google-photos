@@ -9,7 +9,6 @@ from urllib.parse import urljoin, urlparse
 from bs4 import BeautifulSoup
 
 from ...progress import (
-    OverallProgress,
     ProgressSink,
     emit_ops,
     emit_progress,
@@ -69,7 +68,6 @@ class RemoteAlbumDiscovery:
         *,
         headers: Optional[Mapping[str, str]] = None,
         sink: ProgressSink | None = None,
-        overall: OverallProgress | None = None,
     ) -> Tuple[List[RemoteAlbumSnapshot], List[str]]:
         header_map = dict(headers or {})
         queue: List[str] = [root_url.strip()]
@@ -99,9 +97,6 @@ class RemoteAlbumDiscovery:
                     stage="discover",
                     message=f"Fetching {len(wave)} gallery page(s)",
                 )
-                if overall is not None:
-                    overall.add_total(len(wave))
-                    overall.set_message("Fetching gallery pages")
                 fetched = lane.map(
                     [
                         (
@@ -109,7 +104,6 @@ class RemoteAlbumDiscovery:
                                 url,
                                 header_map,
                                 sink=sink,
-                                overall=overall,
                             )
                         )
                         for page_url in wave
@@ -140,7 +134,6 @@ class RemoteAlbumDiscovery:
                         header_map,
                         sink=sink,
                         lane=lane,
-                        overall=overall,
                     )
                     warnings.extend(leaf_warnings)
                     title = (
@@ -225,15 +218,11 @@ class RemoteAlbumDiscovery:
         *,
         sink: ProgressSink | None,
         lane: AdaptiveWorkLane,
-        overall: OverallProgress | None = None,
     ) -> Tuple[List[RemoteItemSnapshot], List[str]]:
         refs = self._merge_index_items(
-            index_url, info, start_content, headers, sink, lane, overall=overall
+            index_url, info, start_content, headers, sink, lane
         )
         warnings: List[str] = []
-        if overall is not None and refs:
-            overall.add_total(len(refs))
-            overall.set_message("Probing remote items")
         emit_progress(
             sink,
             stage="discover",
@@ -263,8 +252,6 @@ class RemoteAlbumDiscovery:
                 byte_size=size,
                 media_url=media_url,
             )
-            if overall is not None:
-                overall.tick(message="Probing remote items")
             return snapshot
 
         snapshots = lane.map([lambda item=item: inspect(item) for item in refs])
@@ -283,8 +270,6 @@ class RemoteAlbumDiscovery:
         headers: Mapping[str, str],
         sink: ProgressSink | None,
         lane: AdaptiveWorkLane,
-        *,
-        overall: OverallProgress | None = None,
     ) -> List[GalleryItemRef]:
         page_entries: Dict[str, Tuple[int, str, Tuple[GalleryItemRef, ...]]] = {}
         start_key = _normalize_url(index_url)
@@ -309,14 +294,11 @@ class RemoteAlbumDiscovery:
                 wave.append(page_url)
             if not wave:
                 break
-            if overall is not None:
-                overall.add_total(len(wave))
-                overall.set_message("Fetching index pages")
             fetched = lane.map(
                 [
                     (
                         lambda url=page_url: self._started_try_get(
-                            url, headers, sink=sink, overall=overall
+                            url, headers, sink=sink
                         )
                     )
                     for page_url in wave
@@ -411,12 +393,9 @@ class RemoteAlbumDiscovery:
         headers: Mapping[str, str],
         *,
         sink: ProgressSink | None,
-        overall: OverallProgress | None = None,
     ) -> Tuple[Optional[FetchedResource], Optional[str]]:
         emit_ops(sink, f"Starting fetch {url}", stage="discover")
         result = self._get_page(url, headers)
-        if overall is not None:
-            overall.tick(message="Fetching gallery pages")
         return result
 
     def _started_try_get(
@@ -425,12 +404,9 @@ class RemoteAlbumDiscovery:
         headers: Mapping[str, str],
         *,
         sink: ProgressSink | None,
-        overall: OverallProgress | None = None,
     ) -> Optional[FetchedResource]:
         emit_ops(sink, f"Starting index page {url}", stage="discover")
         result = self._try_get(url, headers)
-        if overall is not None:
-            overall.tick(message="Fetching index pages")
         return result
 
     def _get_page(

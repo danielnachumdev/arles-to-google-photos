@@ -533,34 +533,72 @@ export function JobDetail({ jobId }: { jobId: string }) {
           <ul className="job-detail__children">
             {children.map((child) => {
               const label = childDisplayLabel(child)
+              const childProgress = child.progress
+              const childPct =
+                childProgress && childProgress.total > 0
+                  ? Math.min(
+                      100,
+                      Math.round((childProgress.current / childProgress.total) * 100),
+                    )
+                  : 0
               return (
                 <li key={child.id} className="job-detail__child">
-                  {child.number != null ? (
-                    <span className="job-detail__child-number" dir="ltr">
-                      {child.number}
-                    </span>
-                  ) : null}
-                  <Link
-                    className="job-detail__link job-detail__child-id"
-                    to={`/jobs/${child.id}`}
-                    dir="ltr"
-                    aria-label={t.jobsOpenAria(label)}
-                  >
-                    {child.id}
-                  </Link>
-                  {child.type ? (
-                    <span className="job-detail__type-label">{jobTypeLabel(child.type)}</span>
-                  ) : null}
-                  {child.status ? <JobStatusBadge status={child.status} /> : null}
-                  {label !== child.id ? (
-                    <span className="job-detail__child-title" dir="auto">
-                      {label}
-                    </span>
-                  ) : null}
-                  {childHasAlbumDesk(child) ? (
-                    <Link className="job-detail__link" to={`/albums/${child.id}`}>
-                      {t.openAlbum}
+                  <div className="job-detail__child-row">
+                    {child.number != null ? (
+                      <span className="job-detail__child-number" dir="ltr">
+                        {child.number}
+                      </span>
+                    ) : null}
+                    <Link
+                      className="job-detail__link job-detail__child-id"
+                      to={`/jobs/${child.id}`}
+                      dir="ltr"
+                      aria-label={t.jobsOpenAria(label)}
+                    >
+                      {child.id}
                     </Link>
+                    {child.type ? (
+                      <span className="job-detail__type-label">{jobTypeLabel(child.type)}</span>
+                    ) : null}
+                    {child.status ? <JobStatusBadge status={child.status} /> : null}
+                    {label !== child.id ? (
+                      <span className="job-detail__child-title" dir="auto">
+                        {label}
+                      </span>
+                    ) : null}
+                    {childHasAlbumDesk(child) ? (
+                      <Link className="job-detail__link" to={`/albums/${child.id}`}>
+                        {t.openAlbum}
+                      </Link>
+                    ) : null}
+                  </div>
+                  {childProgress && childProgress.total > 0 ? (
+                    <div
+                      className="job-detail__child-progress"
+                      role="status"
+                      aria-label={t.jobProgressHeading}
+                    >
+                      <div className="job-detail__child-progress-meta">
+                        <span className="job-detail__child-progress-message" dir="auto">
+                          {childProgress.message || t.jobProgressHeading}
+                        </span>
+                        <span className="job-detail__progress-count" dir="ltr">
+                          {childProgress.current}/{childProgress.total}
+                        </span>
+                      </div>
+                      <div
+                        className="job-detail__progress-bar job-detail__progress-bar--child"
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={childPct}
+                      >
+                        <div
+                          className="job-detail__progress-fill"
+                          style={{ width: `${childPct}%` }}
+                        />
+                      </div>
+                    </div>
                   ) : null}
                 </li>
               )

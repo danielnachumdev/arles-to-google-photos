@@ -25,9 +25,7 @@ class _FakeDiscovery:
         *,
         headers: Optional[Dict[str, str]] = None,
         sink: Any = None,
-        overall: Any = None,
     ) -> Tuple[List[RemoteAlbumSnapshot], List[str]]:
-        del overall
         return (
             [
                 RemoteAlbumSnapshot(
@@ -47,9 +45,8 @@ class _FakeDiscovery:
 
 class _FakePhotos:
     def index(
-        self, gp: Any, *, sink: Any = None, overall: Any = None
+        self, gp: Any, *, sink: Any = None
     ) -> Tuple[List[PhotosAlbumSnapshot], List[str]]:
-        del overall
         return (
             [
                 PhotosAlbumSnapshot(
@@ -110,3 +107,18 @@ def test_validate_runs_and_persists_report(client: TestClient) -> None:
     assert isinstance(report, dict)
     assert report["identical"] is True
     assert report["summary"]["matched"] == 1
+
+    history = client.get(f"/api/jobs/{body['id']}/history").json()["events"]
+    progress = [event for event in history if event.get("kind") == "progress"]
+    assert [(event["current"], event["total"]) for event in progress] == [
+        (1, 3),
+        (2, 3),
+        (3, 3),
+    ]
+    summary = client.get(f"/api/jobs").json()["jobs"]
+    validate_row = next(job for job in summary if job["id"] == body["id"])
+    assert validate_row["progress"] == {
+        "current": 3,
+        "total": 3,
+        "message": "Comparing indexes",
+    }

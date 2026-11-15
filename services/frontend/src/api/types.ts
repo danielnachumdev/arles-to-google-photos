@@ -71,6 +71,12 @@ export type AlbumPreview = {
   structure_fallback?: boolean | null
 }
 
+export type JobProgressSnapshot = {
+  current: number
+  total: number
+  message?: string | null
+}
+
 export type JobChild = {
   id: string
   number?: number | null
@@ -88,6 +94,7 @@ export type JobChild = {
   created_at?: string | null
   parent_job_id?: string | null
   import_origin?: ImportOrigin | null
+  progress?: JobProgressSnapshot | null
 }
 
 export type Job = {
@@ -168,6 +175,7 @@ export type JobSummary = {
   user_edited?: boolean
   import_origin?: ImportOrigin | null
   archived_at?: string | null
+  progress?: JobProgressSnapshot | null
 }
 
 export type JobArchiveResult = {

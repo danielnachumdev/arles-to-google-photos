@@ -426,6 +426,7 @@ describe('JobDetail', () => {
       status: 'done',
       type: 'preview',
       title: 'Day 1',
+      progress: { current: 3, total: 3, message: 'Preview ready' },
       preview: {
         title: 'Day 1',
         description: null,
@@ -439,6 +440,7 @@ describe('JobDetail', () => {
       number: 14,
       status: 'pending',
       type: 'upload',
+      progress: { current: 1, total: 4, message: 'Uploading' },
     }
     const scrapeJob: Job = {
       id: 'scrape-root',
@@ -509,6 +511,18 @@ describe('JobDetail', () => {
     const uploadChild = screen.getByRole('link', { name: t.jobsOpenAria('upload-day1') }).closest('li')
     expect(previewChild).toHaveTextContent('13')
     expect(uploadChild).toHaveTextContent('14')
+    expect(previewChild).toHaveTextContent('3/3')
+    expect(previewChild).toHaveTextContent('Preview ready')
+    expect(uploadChild).toHaveTextContent('1/4')
+    expect(uploadChild).toHaveTextContent('Uploading')
+    expect(within(previewChild as HTMLElement).getByRole('progressbar')).toHaveAttribute(
+      'aria-valuenow',
+      '100',
+    )
+    expect(within(uploadChild as HTMLElement).getByRole('progressbar')).toHaveAttribute(
+      'aria-valuenow',
+      '25',
+    )
     const fields = screen.getByText(t.jobIdLabel).closest('dl') as HTMLElement
     expect(within(fields).queryByRole('link', { name: t.openAlbum })).toBeNull()
     expect(screen.getByRole('link', { name: t.openAlbum })).toHaveAttribute(

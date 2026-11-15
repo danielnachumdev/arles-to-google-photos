@@ -5,7 +5,6 @@ from pathlib import Path
 from typing import Any, List, Optional, Tuple
 
 from ...progress import (
-    OverallProgress,
     ProgressSink,
     emit_ops,
     emit_progress,
@@ -48,7 +47,6 @@ class PhotosAlbumIndexer:
         gp: Any,
         *,
         sink: ProgressSink | None = None,
-        overall: OverallProgress | None = None,
     ) -> Tuple[List[PhotosAlbumSnapshot], List[str]]:
         from gpsdk import Album, MediaItem
 
@@ -82,7 +80,6 @@ class PhotosAlbumIndexer:
                     sink=sink,
                     warnings=warnings,
                     lane=lane,
-                    overall=overall,
                 )
                 built.append((title, album, tuple(items)))
         finally:
@@ -114,13 +111,9 @@ class PhotosAlbumIndexer:
         sink: ProgressSink | None,
         warnings: List[str],
         lane: AdaptiveWorkLane,
-        overall: OverallProgress | None = None,
     ) -> List[PhotosItemSnapshot]:
         media_list = list(MediaItem.search_all(gp, albumId=album.id, pageSize=50))
         raise_if_cancelled(sink)
-        if overall is not None and media_list:
-            overall.add_total(len(media_list))
-            overall.set_message("Probing Photos sizes")
         emit_progress(
             sink,
             stage="photos",
@@ -150,8 +143,6 @@ class PhotosAlbumIndexer:
                 byte_size=size,
                 media_item_id=str(getattr(media, "id", "") or ""),
             )
-            if overall is not None:
-                overall.tick(message="Probing Photos sizes")
             return snapshot
 
         items = lane.map([lambda m=media: probe(m) for media in media_list])
