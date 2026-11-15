@@ -96,6 +96,7 @@ export const en: MessageCatalog = {
   runHistoryHeading: 'Logs',
   runHistoryEmpty: 'No log lines yet.',
   technicalLogs: 'Technical logs',
+  jobProgressHeading: 'Progress',
   jobLogLifecycle: (stage) => {
     if (stage === 'preview_ready') {
       return 'Preview ready'
@@ -213,6 +214,36 @@ export const en: MessageCatalog = {
   validationMismatchCaption: 'Caption',
   validationMismatchSize: 'Size',
   validationMismatchSizeUnavailable: 'Size unavailable',
+  validationFilterAll: 'All',
+  validationFilterIssues: 'With differences',
+  validationFilterAria: 'Filter albums',
+  validationSuppressRemoteSmallerSizes: 'Ignore smaller remote file sizes',
+  validationSearchLabel: 'Search albums',
+  validationSearchPlaceholder: 'Search by album title…',
+  validationAlbumListAria: 'Albums in this report',
+  validationNoAlbumsFiltered: 'No albums match this filter.',
+  validationSelectAlbum: 'Select an album to compare.',
+  validationIssueCount: (n) => (n === 1 ? '1 difference' : `${n} differences`),
+  validationItemCount: (n) => (n === 1 ? '1 item' : `${n} items`),
+  validationOnlyRemoteLede:
+    'This album exists on the remote gallery but not among app-created Photos albums.',
+  validationOnlyPhotosLede:
+    'This album exists in app-created Photos but was not found on the remote gallery.',
+  validationAlbumIdenticalLede: 'Remote and Photos match for this album.',
+  validationAlbumDiffLede: (n) =>
+    n === 1
+      ? '1 difference between remote and Photos for this album.'
+      : `${n} differences between remote and Photos for this album.`,
+  validationOpenRemote: 'Open remote album',
+  validationOpenPhotos: 'Open in Google Photos',
+  validationFieldMismatches: 'Field mismatches',
+  validationNoItemsInSection: 'None',
+  validationColItem: 'Item',
+  validationColField: 'Field',
+  validationColRemote: 'Remote',
+  validationColPhotos: 'Photos',
+  validationWarningsHeading: (n) =>
+    n === 1 ? '1 warning during discovery' : `${n} warnings during discovery`,
 
   importModeAria: 'Import source',
   importModeUpload: 'Upload an exported album folder',

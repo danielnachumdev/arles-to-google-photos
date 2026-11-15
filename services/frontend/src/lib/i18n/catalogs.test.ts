@@ -98,6 +98,8 @@ describe('i18n catalogs', () => {
     expect(messages.en.runHistoryHeading).toBe('Logs')
     expect(messages.he.technicalLogs).toBe('לוג טכני')
     expect(messages.en.technicalLogs).toBe('Technical logs')
+    expect(messages.he.jobProgressHeading).toBe('התקדמות')
+    expect(messages.en.jobProgressHeading).toBe('Progress')
     expect(messages.he.jobLogLifecycle('preview_ready')).toBe('התצוגה מוכנה')
     expect(messages.en.jobLogLifecycle('preview_ready')).toBe('Preview ready')
     expect(messages.he.autoPublishLabel).toBe('פרסום אוטומטי ל-Photos')

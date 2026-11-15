@@ -99,17 +99,26 @@ class TestPublishAndRestartEdges(ApiClientSuite):
         assert response.status_code == 400
         assert "no items" in response.json()["detail"]
 
-    def test_restart_not_cancelled_is_409(self, tmp_path: Path) -> None:
+    def test_restart_done_preview_is_201(self, tmp_path: Path) -> None:
+        """Terminal jobs (done/failed/cancelled) can be restarted as a new run."""
         api = self.make_api()
         job = api.ingest()
         response = api.client.post(f"/api/jobs/{job['id']}/restart", json={})
-        assert response.status_code == 409
+        assert response.status_code == 201, response.text
+        body = response.json()
+        assert body["id"] != job["id"]
+        assert body["status"] in {"pending", "running", "done"}
+        assert body["type"] == "preview"
 
-    def test_restart_preview_not_cancelled_is_409(self, tmp_path: Path) -> None:
+    def test_restart_preview_done_is_200(self, tmp_path: Path) -> None:
         api = self.make_api()
         job = api.ingest()
         response = api.client.get(f"/api/jobs/{job['id']}/restart-preview")
-        assert response.status_code == 409
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert body["job"]["id"] == job["id"]
+        assert "done" in body
+        assert "remaining" in body
 
     def test_patch_unknown_caption_is_400(self, tmp_path: Path) -> None:
         api = self.make_api()

@@ -104,7 +104,7 @@ class TestJobHelpers(JobStoreSuite):
         assert peek_gallery_title([("index.html", broken, None)]) == "Day"
 
     def test_event_kind_alias_and_naive_timestamp(self) -> None:
-        assert infer_event_kind("ingest", "progress") == "lifecycle"
+        assert infer_event_kind("ingest", "progress") == "progress"
         event = event_from_dict(
             {
                 "stage": "ingest",

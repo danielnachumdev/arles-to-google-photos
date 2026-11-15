@@ -5,6 +5,7 @@ import threading
 from collections import deque
 from typing import Any, Callable, Deque, Dict, List, Optional, Protocol, Set
 
+from .events import KIND_PROGRESS
 from .store import (
     STATUS_CANCELLED,
     STATUS_DONE,
@@ -13,6 +14,7 @@ from .store import (
     STATUS_RUNNING,
     STATUS_WAITING,
     JobStore,
+    scrape_child_progress,
 )
 
 DEFAULT_MAX_CONCURRENT = 3
@@ -280,6 +282,7 @@ class JobOrchestrator:
                     job_id, STATUS_WAITING, job_type=job.type, warnings=[]
                 )
                 self._emit(job_id, "waiting")
+            self._emit_scrape_child_progress(job_id)
             return
         with self._lock:
             self._waiting.discard(job_id)
@@ -296,6 +299,7 @@ class JobOrchestrator:
             )
             if not already_done:
                 self._emit(job_id, "done")
+        self._emit_scrape_child_progress(job_id)
         self._notify_ancestors(job_id)
 
     def _notify_ancestors(self, job_id: str) -> None:
@@ -321,3 +325,23 @@ class JobOrchestrator:
         if self._events is None:
             return
         self._events.emit(job_id, stage, message)
+
+    def _emit_scrape_child_progress(self, job_id: str) -> None:
+        if self._events is None:
+            return
+        done, total = scrape_child_progress(self._store, job_id)
+        if total <= 0:
+            return
+        message = (
+            "Child albums complete"
+            if done >= total
+            else "Waiting on child albums"
+        )
+        self._events.emit(
+            job_id,
+            "progress",
+            message,
+            current=done,
+            total=total,
+            kind=KIND_PROGRESS,
+        )

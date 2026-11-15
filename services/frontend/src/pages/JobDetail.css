@@ -186,6 +186,65 @@
   cursor: pointer;
 }
 
+.job-detail__progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+  margin-block-end: 0.85rem;
+  padding: 0.65rem 0.75rem;
+  background: color-mix(in srgb, var(--canvas) 70%, var(--surface));
+  border: 1px solid var(--line);
+  border-radius: var(--radius-print);
+}
+
+.job-detail__progress-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.4rem 0.75rem;
+}
+
+.job-detail__progress-label {
+  font-family: var(--font-ui);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--color-ink);
+}
+
+.job-detail__progress-count {
+  font-family: var(--font-mono);
+  font-size: 0.82rem;
+  font-variant-numeric: tabular-nums;
+  color: var(--color-rail);
+}
+
+.job-detail__progress-bar {
+  height: 0.45rem;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--line) 70%, var(--surface));
+  overflow: hidden;
+}
+
+.job-detail__progress-fill {
+  height: 100%;
+  border-radius: inherit;
+  background: color-mix(in srgb, var(--color-cyan) 78%, var(--color-ink));
+  transition: width 0.2s ease;
+}
+
+.job-detail__progress-message {
+  margin: 0;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.45rem 0.75rem;
+  font-family: var(--font-ui);
+  font-size: 0.86rem;
+  color: var(--color-ink);
+  text-align: start;
+}
+
 .job-detail__log {
   list-style: none;
   margin: 0;
@@ -269,15 +328,21 @@
 
 .job-detail__child {
   display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  gap: 0.35rem 0.7rem;
+  flex-direction: column;
+  gap: 0.4rem;
   padding-block: 0.5rem;
   padding-inline: 0.65rem;
   border: 1px solid var(--line);
   border-radius: var(--radius-panel);
   background: var(--surface);
   text-align: start;
+}
+
+.job-detail__child-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.35rem 0.7rem;
 }
 
 .job-detail__child-id {
@@ -288,4 +353,29 @@
 .job-detail__child-title {
   font-family: var(--font-ui);
   color: var(--color-ink);
+}
+
+.job-detail__child-progress {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  width: 100%;
+}
+
+.job-detail__child-progress-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.35rem 0.65rem;
+}
+
+.job-detail__child-progress-message {
+  font-family: var(--font-ui);
+  font-size: 0.8rem;
+  color: var(--color-rail);
+}
+
+.job-detail__progress-bar--child {
+  height: 0.35rem;
 }

@@ -94,6 +94,7 @@ export const he: MessageCatalog = {
   runHistoryHeading: 'לוג',
   runHistoryEmpty: 'אין שורות לוג עדיין.',
   technicalLogs: 'לוג טכני',
+  jobProgressHeading: 'התקדמות',
   jobLogLifecycle: (stage) => {
     if (stage === 'preview_ready') {
       return 'התצוגה מוכנה'
@@ -208,6 +209,36 @@ export const he: MessageCatalog = {
   validationMismatchCaption: 'כיתוב',
   validationMismatchSize: 'גודל',
   validationMismatchSizeUnavailable: 'גודל לא זמין',
+  validationFilterAll: 'הכול',
+  validationFilterIssues: 'עם הבדלים',
+  validationFilterAria: 'סינון אלבומים',
+  validationSuppressRemoteSmallerSizes: 'התעלם מקבצים קטנים יותר באתר המרוחק',
+  validationSearchLabel: 'חיפוש אלבומים',
+  validationSearchPlaceholder: 'חיפוש לפי כותרת אלבום…',
+  validationAlbumListAria: 'אלבומים בדוח זה',
+  validationNoAlbumsFiltered: 'אין אלבומים שתואמים לסינון.',
+  validationSelectAlbum: 'בחרו אלבום להשוואה.',
+  validationIssueCount: (n) => (n === 1 ? 'הבדל אחד' : `${n} הבדלים`),
+  validationItemCount: (n) => (n === 1 ? 'פריט אחד' : `${n} פריטים`),
+  validationOnlyRemoteLede:
+    'האלבום קיים בגלריה המרוחקת אך לא בין אלבומי Photos שנוצרו באפליקציה.',
+  validationOnlyPhotosLede:
+    'האלבום קיים ב-Photos שנוצרו באפליקציה אך לא נמצא בגלריה המרוחקת.',
+  validationAlbumIdenticalLede: 'המרוחק ו-Photos תואמים באלבום זה.',
+  validationAlbumDiffLede: (n) =>
+    n === 1
+      ? 'הבדל אחד בין המרוחק ל-Photos באלבום זה.'
+      : `${n} הבדלים בין המרוחק ל-Photos באלבום זה.`,
+  validationOpenRemote: 'פתיחת אלבום מרוחק',
+  validationOpenPhotos: 'פתיחה ב-Google Photos',
+  validationFieldMismatches: 'אי-התאמות בשדות',
+  validationNoItemsInSection: 'אין',
+  validationColItem: 'פריט',
+  validationColField: 'שדה',
+  validationColRemote: 'מרוחק',
+  validationColPhotos: 'Photos',
+  validationWarningsHeading: (n) =>
+    n === 1 ? 'אזהרה אחת במהלך הגילוי' : `${n} אזהרות במהלך הגילוי`,
 
   importModeAria: 'אופן ייבוא',
   importModeUpload: 'העלאת תיקיית אלבום מיוצאת',

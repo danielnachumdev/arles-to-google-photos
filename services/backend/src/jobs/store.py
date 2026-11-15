@@ -517,6 +517,31 @@ def _first_preview_child_ids(jobs: List[Job]) -> Dict[str, str]:
     return result
 
 
+def scrape_child_progress(store: "JobStore", parent_id: str) -> Tuple[int, int]:
+    """Terminal scrape-children count and total for a hub/parent sticky bar."""
+    children = [
+        child for child in store.list_children(parent_id) if child.type == TYPE_SCRAPE
+    ]
+    total = len(children)
+    done = sum(1 for child in children if child.status in _TERMINAL_STATUSES)
+    return done, total
+
+
+def latest_progress_snapshot(job: Job) -> Optional[Dict[str, Any]]:
+    """Latest sticky overall progress event (``kind=progress``, total > 0)."""
+    latest: Optional[JobEvent] = None
+    for event in job.events:
+        if event.kind == "progress" and int(event.total or 0) > 0:
+            latest = event
+    if latest is None:
+        return None
+    return {
+        "current": int(latest.current or 0),
+        "total": int(latest.total or 0),
+        "message": str(latest.message or ""),
+    }
+
+
 def job_summary_to_dict(
     job: Job,
     *,
@@ -556,6 +581,7 @@ def job_summary_to_dict(
             parent_job_id=job.parent_job_id,
             scrape_url=job.scrape_url,
         ),
+        "progress": latest_progress_snapshot(job),
     }
 
 

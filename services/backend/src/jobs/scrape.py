@@ -36,6 +36,7 @@ from .store import (
     TYPE_SCRAPE,
     Job,
     JobStore,
+    scrape_child_progress,
 )
 
 
@@ -259,14 +260,17 @@ class ScrapeService:
                     )
                     self._enqueue_child(child_id)
                     existing_urls.add(child_url)
+                self._emit_scrape_child_progress(job_id)
             if store_is_cancelled(self._store, job_id):
                 raise JobCancelled()
             if self._store.has_active_descendants(job_id):
                 self._store.set_status(job_id, STATUS_WAITING, job_type=TYPE_SCRAPE)
                 self._events.emit(job_id, "waiting", scrape_url)
+                self._emit_scrape_child_progress(job_id)
             else:
                 self._store.set_status(job_id, STATUS_DONE, job_type=TYPE_SCRAPE)
                 self._events.emit(job_id, "done", scrape_url)
+                self._emit_scrape_child_progress(job_id)
         except JobCancelled:
             if self._auto_publisher is not None:
                 self._auto_publisher.discard(job_id)
@@ -341,6 +345,22 @@ class ScrapeService:
         for child in self._store.list_cancellable_descendants(job_id):
             if self._store.cancel_if_running(child.id):
                 self._events.emit(child.id, "cancelled", "Job cancelled")
+
+    def _emit_scrape_child_progress(self, job_id: str) -> None:
+        done, total = scrape_child_progress(self._store, job_id)
+        if total <= 0:
+            return
+        message = (
+            "Child albums complete"
+            if done >= total
+            else "Waiting on child albums"
+        )
+        self._events.sink_for(job_id).progress(
+            message,
+            stage="progress",
+            current=done,
+            total=total,
+        )
 
     def _download_sink(self, job_id: str) -> Any:
         parent_sink = self._events.sink_for(job_id)

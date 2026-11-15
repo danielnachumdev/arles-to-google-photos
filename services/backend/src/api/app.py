@@ -124,6 +124,14 @@ def create_app(
         auto_publisher=auto_publisher,
         submit=orchestrator.submit,
     )
+    validate = ValidateService(
+        store=store,
+        events=events,
+        gp_factory=gp_factory or _default_gp_factory,
+        jobs_root=root,
+        vault=AccessTokenVault(),
+        submit=orchestrator.submit,
+    )
     restart = RestartService(
         store=store,
         scrape=scrape,
@@ -132,14 +140,7 @@ def create_app(
         jobs_root=root,
         submit=orchestrator.submit,
         auto_publisher=auto_publisher,
-    )
-    validate = ValidateService(
-        store=store,
-        events=events,
-        gp_factory=gp_factory or _default_gp_factory,
-        jobs_root=root,
-        vault=AccessTokenVault(),
-        submit=orchestrator.submit,
+        validate=validate,
     )
 
     app = FastAPI(title="Arles Migrator", version=__version__)

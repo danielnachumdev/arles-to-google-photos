@@ -1,4 +1,4 @@
-"""Restart a cancelled job as a new pending run (new id), not same-id retry."""
+"""Restart a finished job as a new pending run (new id), not same-id retry."""
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,9 +7,11 @@ from typing import Any, Callable, Dict, Mapping, Optional, Protocol
 from .store import (
     STATUS_CANCELLED,
     STATUS_DONE,
+    STATUS_FAILED,
     TYPE_PREVIEW,
     TYPE_SCRAPE,
     TYPE_UPLOAD,
+    TYPE_VALIDATE,
     Job,
     JobNotFoundError,
     JobStore,
@@ -18,10 +20,11 @@ from .store import (
 RESTART_MODE_ALL = "all"
 RESTART_MODE_REMAINING = "remaining"
 _RESTART_MODES = frozenset({RESTART_MODE_ALL, RESTART_MODE_REMAINING})
+_RESTARTABLE_STATUSES = frozenset({STATUS_DONE, STATUS_FAILED, STATUS_CANCELLED})
 
 
 class JobNotRestartableError(ValueError):
-    """Raised when restart is requested for a job that is not cancelled."""
+    """Raised when restart is requested for a job that is still active."""
 
 
 class _ScrapeLike(Protocol):
@@ -73,8 +76,23 @@ class _AutoPublisherLike(Protocol):
         ...
 
 
+class _ValidateLike(Protocol):
+    def start(
+        self,
+        url: str,
+        *,
+        access_token: str,
+        headers: Optional[Mapping[str, str]] = None,
+        owner_id: Optional[str] = None,
+    ) -> str:
+        ...
+
+    def finish(self, job_id: str, *, access_token: Optional[str] = None) -> None:
+        ...
+
+
 class RestartService:
-    """Create a new job from a cancelled run and enqueue it under the orchestrator."""
+    """Create a new job from a finished run and enqueue it under the orchestrator."""
 
     def __init__(
         self,
@@ -85,6 +103,7 @@ class RestartService:
         jobs_root: Path,
         submit: Callable[[str, Callable[[], None]], None],
         auto_publisher: Optional[_AutoPublisherLike] = None,
+        validate: Optional[_ValidateLike] = None,
     ) -> None:
         self._store = store
         self._scrape = scrape
@@ -93,14 +112,14 @@ class RestartService:
         self._jobs_root = Path(jobs_root)
         self._submit = submit
         self._auto_publisher = auto_publisher
+        self._validate = validate
 
     def preview(self, job_id: str) -> Dict[str, Any]:
         try:
             source = self._store.get(job_id)
         except JobNotFoundError:
             raise
-        if source.status != STATUS_CANCELLED:
-            raise JobNotRestartableError("job is not cancelled")
+        self._require_restartable(source)
         return self._store.restart_preview_dict(job_id)
 
     def restart(
@@ -114,8 +133,7 @@ class RestartService:
             source = self._store.get(job_id)
         except JobNotFoundError:
             raise
-        if source.status != STATUS_CANCELLED:
-            raise JobNotRestartableError("job is not cancelled")
+        self._require_restartable(source)
         resolved_mode = (mode or RESTART_MODE_ALL).strip().lower() or RESTART_MODE_ALL
         if resolved_mode not in _RESTART_MODES:
             raise ValueError("unsupported restart mode")
@@ -126,7 +144,13 @@ class RestartService:
             return self._restart_preview(source, token)
         if source.type == TYPE_UPLOAD:
             return self._restart_upload(source, token)
+        if source.type == TYPE_VALIDATE:
+            return self._restart_validate(source, token)
         raise ValueError(f"unsupported job type: {source.type}")
+
+    def _require_restartable(self, source: Job) -> None:
+        if source.status not in _RESTARTABLE_STATUSES:
+            raise JobNotRestartableError("job is still active")
 
     def _restart_scrape(
         self,
@@ -206,6 +230,28 @@ class RestartService:
 
         def run() -> None:
             self._publish.finish(new_id, access_token=token)
+
+        self._submit(new_id, run)
+        return new_id
+
+    def _restart_validate(self, source: Job, token: Optional[str]) -> str:
+        validate = self._validate
+        if validate is None:
+            raise ValueError("validate service unavailable")
+        if not token:
+            raise ValueError("google access token required")
+        if not source.scrape_url:
+            raise ValueError("validate url missing")
+        new_id = validate.start(
+            source.scrape_url,
+            access_token=token,
+            headers=source.scrape_headers,
+            owner_id=source.owner_id,
+        )
+        self._store.update_extra(new_id, {"restarted_from": source.id})
+
+        def run() -> None:
+            validate.finish(new_id, access_token=token)
 
         self._submit(new_id, run)
         return new_id

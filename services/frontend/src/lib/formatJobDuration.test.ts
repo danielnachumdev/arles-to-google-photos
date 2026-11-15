@@ -7,6 +7,7 @@ import {
   isJobArchivable,
   isJobCancellable,
   isJobProcessing,
+  isJobRestartable,
   jobDurationSeconds,
 } from './formatJobDuration.ts'
 
@@ -167,5 +168,16 @@ describe('isJobArchivable', () => {
     expect(isJobArchivable('pending')).toBe(false)
     expect(isJobArchivable('running')).toBe(false)
     expect(isJobArchivable('waiting')).toBe(false)
+  })
+})
+
+describe('isJobRestartable', () => {
+  it('treats done, failed, and cancelled as restartable', () => {
+    expect(isJobRestartable('done')).toBe(true)
+    expect(isJobRestartable('failed')).toBe(true)
+    expect(isJobRestartable('cancelled')).toBe(true)
+    expect(isJobRestartable('pending')).toBe(false)
+    expect(isJobRestartable('running')).toBe(false)
+    expect(isJobRestartable('waiting')).toBe(false)
   })
 })

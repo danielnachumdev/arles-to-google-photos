@@ -286,7 +286,7 @@ def restart_preview(
     deps: ApiDependencies = Depends(get_deps),
     user: UserRecord = Depends(get_current_user),
 ) -> Dict[str, Any]:
-    """Scrape children split into done vs remaining for a cancelled restart."""
+    """Scrape children split into done vs remaining for a finished-job restart."""
     require_job(deps.store, job_id, owner_id=user.id)
     try:
         return deps.restart.preview(job_id)
@@ -294,7 +294,7 @@ def restart_preview(
         raise HTTPException(status_code=404, detail="job not found") from exc
     except JobNotRestartableError as exc:
         raise HTTPException(
-            status_code=409, detail="job is not cancelled"
+            status_code=409, detail="job is still active"
         ) from exc
 
 
@@ -467,7 +467,7 @@ def restart_job(
     deps: ApiDependencies = Depends(get_deps),
     user: UserRecord = Depends(get_current_user),
 ) -> Dict[str, Any]:
-    """Start a new job from a cancelled run. The cancelled job is unchanged."""
+    """Start a new job from a finished run. The source job is unchanged."""
     require_job(deps.store, job_id, owner_id=user.id)
     try:
         new_id = deps.restart.restart(
@@ -479,7 +479,7 @@ def restart_job(
         raise HTTPException(status_code=404, detail="job not found") from exc
     except JobNotRestartableError as exc:
         raise HTTPException(
-            status_code=409, detail="job is not cancelled"
+            status_code=409, detail="job is still active"
         ) from exc
     except ValueError as exc:
         detail = str(exc)

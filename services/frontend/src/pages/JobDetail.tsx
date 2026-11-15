@@ -13,12 +13,17 @@ import { GoogleAuthCancelledError } from '../lib/googleAuth.ts'
 import { withGooglePhotosAccessToken } from '../lib/withGooglePhotosToken.ts'
 import { formatJobDate } from '../lib/formatJobDate.ts'
 import { explainCaughtError, isNotFoundError } from '../lib/formatApiError.ts'
-import { isJobActive, isJobCancellable } from '../lib/formatJobDuration.ts'
+import {
+  isJobActive,
+  isJobCancellable,
+  isJobRestartable,
+} from '../lib/formatJobDuration.ts'
 import {
   formatLogTime,
   isLifecycleJobEvent,
   jobLogMessage,
   jobLogTone,
+  latestOverallProgress,
   shouldShowJobLog,
 } from '../lib/jobLogs.ts'
 import {
@@ -251,8 +256,7 @@ export function JobDetail({ jobId }: { jobId: string }) {
     (job != null && isJobActive(job.status)) ||
     children.some((child) => child.status != null && isJobActive(child.status))
   const cancellable = job != null && isJobCancellable(job.status)
-  const restartable =
-    job != null && job.status === 'cancelled' && job.type !== 'validate'
+  const restartable = job != null && isJobRestartable(job.status)
 
   async function confirmRestart(mode: RestartMode) {
     if (!job || restarting) {
@@ -263,12 +267,12 @@ export function JobDetail({ jobId }: { jobId: string }) {
     setError(null)
     try {
       const restartOptions = mode === 'remaining' ? { mode } : {}
-      const created =
-        job.type === 'upload'
-          ? await withGooglePhotosAccessToken((accessToken) =>
-              client.restartJob(job.id, { accessToken, ...restartOptions }),
-            )
-          : await client.restartJob(job.id, restartOptions)
+      const needsPhotosToken = job.type === 'upload' || job.type === 'validate'
+      const created = needsPhotosToken
+        ? await withGooglePhotosAccessToken((accessToken) =>
+            client.restartJob(job.id, { accessToken, ...restartOptions }),
+          )
+        : await client.restartJob(job.id, restartOptions)
       announceRunSubmitted(created.id, created.number)
       trackRun({
         id: created.id,
@@ -337,6 +341,13 @@ export function JobDetail({ jobId }: { jobId: string }) {
   const albumHref = job ? albumDeskHref(job, children) : null
   const photoCount = job ? jobPhotoCount(job) : null
   const photosUrl = job ? jobPhotosUrl(job) : null
+  // Sticky strip prefers kind=progress (overall); falls back for older jobs.
+  const latestProgress = latestOverallProgress(history)
+  const latestProgressPct =
+    latestProgress && latestProgress.total > 0
+      ? Math.min(100, Math.round((latestProgress.current / latestProgress.total) * 100))
+      : 0
+  const latestProgressEta = latestProgress ? eventEtaSeconds(latestProgress) : null
 
   if (notFound) {
     return <NotFoundPage />
@@ -522,34 +533,72 @@ export function JobDetail({ jobId }: { jobId: string }) {
           <ul className="job-detail__children">
             {children.map((child) => {
               const label = childDisplayLabel(child)
+              const childProgress = child.progress
+              const childPct =
+                childProgress && childProgress.total > 0
+                  ? Math.min(
+                      100,
+                      Math.round((childProgress.current / childProgress.total) * 100),
+                    )
+                  : 0
               return (
                 <li key={child.id} className="job-detail__child">
-                  {child.number != null ? (
-                    <span className="job-detail__child-number" dir="ltr">
-                      {child.number}
-                    </span>
-                  ) : null}
-                  <Link
-                    className="job-detail__link job-detail__child-id"
-                    to={`/jobs/${child.id}`}
-                    dir="ltr"
-                    aria-label={t.jobsOpenAria(label)}
-                  >
-                    {child.id}
-                  </Link>
-                  {child.type ? (
-                    <span className="job-detail__type-label">{jobTypeLabel(child.type)}</span>
-                  ) : null}
-                  {child.status ? <JobStatusBadge status={child.status} /> : null}
-                  {label !== child.id ? (
-                    <span className="job-detail__child-title" dir="auto">
-                      {label}
-                    </span>
-                  ) : null}
-                  {childHasAlbumDesk(child) ? (
-                    <Link className="job-detail__link" to={`/albums/${child.id}`}>
-                      {t.openAlbum}
+                  <div className="job-detail__child-row">
+                    {child.number != null ? (
+                      <span className="job-detail__child-number" dir="ltr">
+                        {child.number}
+                      </span>
+                    ) : null}
+                    <Link
+                      className="job-detail__link job-detail__child-id"
+                      to={`/jobs/${child.id}`}
+                      dir="ltr"
+                      aria-label={t.jobsOpenAria(label)}
+                    >
+                      {child.id}
                     </Link>
+                    {child.type ? (
+                      <span className="job-detail__type-label">{jobTypeLabel(child.type)}</span>
+                    ) : null}
+                    {child.status ? <JobStatusBadge status={child.status} /> : null}
+                    {label !== child.id ? (
+                      <span className="job-detail__child-title" dir="auto">
+                        {label}
+                      </span>
+                    ) : null}
+                    {childHasAlbumDesk(child) ? (
+                      <Link className="job-detail__link" to={`/albums/${child.id}`}>
+                        {t.openAlbum}
+                      </Link>
+                    ) : null}
+                  </div>
+                  {childProgress && childProgress.total > 0 ? (
+                    <div
+                      className="job-detail__child-progress"
+                      role="status"
+                      aria-label={t.jobProgressHeading}
+                    >
+                      <div className="job-detail__child-progress-meta">
+                        <span className="job-detail__child-progress-message" dir="auto">
+                          {childProgress.message || t.jobProgressHeading}
+                        </span>
+                        <span className="job-detail__progress-count" dir="ltr">
+                          {childProgress.current}/{childProgress.total}
+                        </span>
+                      </div>
+                      <div
+                        className="job-detail__progress-bar job-detail__progress-bar--child"
+                        role="progressbar"
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                        aria-valuenow={childPct}
+                      >
+                        <div
+                          className="job-detail__progress-fill"
+                          style={{ width: `${childPct}%` }}
+                        />
+                      </div>
+                    </div>
                   ) : null}
                 </li>
               )
@@ -570,6 +619,40 @@ export function JobDetail({ jobId }: { jobId: string }) {
             {t.technicalLogs}
           </label>
         </div>
+        {latestProgress ? (
+          <div
+            className="job-detail__progress"
+            role="status"
+            aria-label={t.jobProgressHeading}
+          >
+            <div className="job-detail__progress-meta">
+              <span className="job-detail__progress-label">{t.jobProgressHeading}</span>
+              <span className="job-detail__progress-count" dir="ltr">
+                {latestProgress.current}/{latestProgress.total}
+              </span>
+            </div>
+            <div
+              className="job-detail__progress-bar"
+              role="progressbar"
+              aria-valuemin={0}
+              aria-valuemax={latestProgress.total}
+              aria-valuenow={latestProgress.current}
+            >
+              <div
+                className="job-detail__progress-fill"
+                style={{ width: `${latestProgressPct}%` }}
+              />
+            </div>
+            <p className="job-detail__progress-message" dir="auto">
+              {jobLogMessage(latestProgress, t.jobLogLifecycle)}
+              {latestProgressEta != null ? (
+                <span className="job-detail__eta" dir="ltr">
+                  {t.etaLeft(latestProgressEta)}
+                </span>
+              ) : null}
+            </p>
+          </div>
+        ) : null}
         {history.length === 0 && !loading ? (
           <p className="job-detail__empty">{t.runHistoryEmpty}</p>
         ) : null}
