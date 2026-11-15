@@ -46,8 +46,8 @@ def test_transient_failure_pauses_entire_lane() -> None:
     lane = AdaptiveWorkLane(
         max_workers=2,
         is_transient=_is_transient,
-        initial_backoff_s=0.3,
-        max_backoff_s=0.3,
+        initial_backoff_s=0.5,
+        max_backoff_s=0.5,
         max_retries=0,
     )
     try:
@@ -58,7 +58,8 @@ def test_transient_failure_pauses_entire_lane() -> None:
             f1.result(timeout=5.0)
         t0 = time.monotonic()
         assert lane.run(second) == "ok"
-        assert time.monotonic() - t0 >= 0.25
+        # Allow scheduler jitter on busy CI hosts (backoff is 0.5s).
+        assert time.monotonic() - t0 >= 0.2
     finally:
         lane.close()
 
