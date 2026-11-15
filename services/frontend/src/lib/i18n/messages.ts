@@ -171,6 +171,29 @@ export type MessageCatalog = {
   validationMismatchCaption: string
   validationMismatchSize: string
   validationMismatchSizeUnavailable: string
+  validationFilterAll: string
+  validationFilterIssues: string
+  validationFilterAria: string
+  validationSearchLabel: string
+  validationSearchPlaceholder: string
+  validationAlbumListAria: string
+  validationNoAlbumsFiltered: string
+  validationSelectAlbum: string
+  validationIssueCount: (n: number) => string
+  validationItemCount: (n: number) => string
+  validationOnlyRemoteLede: string
+  validationOnlyPhotosLede: string
+  validationAlbumIdenticalLede: string
+  validationAlbumDiffLede: (n: number) => string
+  validationOpenRemote: string
+  validationOpenPhotos: string
+  validationFieldMismatches: string
+  validationNoItemsInSection: string
+  validationColItem: string
+  validationColField: string
+  validationColRemote: string
+  validationColPhotos: string
+  validationWarningsHeading: (n: number) => string
 
   importModeAria: string
   importModeUpload: string
