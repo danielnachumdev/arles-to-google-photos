@@ -7,6 +7,8 @@ from src.progress import (
     CancellableProgressSink,
     FanOutProgressSink,
     JobCancelled,
+    OverallProgress,
+    ThrottledProgress,
     emit_ops,
     emit_progress,
     raise_if_cancelled,
@@ -85,3 +87,39 @@ class TestProgressHelpers(ProgressSuite):
         fan.ops("GET /index.html", stage="scrape")
         assert first.events == second.events == [("parse", "a.jpg", 1, 2)]
         assert first.ops_events == second.ops_events == [("scrape", "GET /index.html", 0, 0)]
+
+    def test_throttled_progress_emits_edges_and_respects_interval(self) -> None:
+        sink = RecordingSink()
+        progress = ThrottledProgress(
+            sink,
+            stage="discover",
+            message="Probing remote items",
+            total=5,
+            interval_s=60.0,
+        )
+        for _ in range(5):
+            progress.tick()
+        messages = [event[1] for event in sink.events]
+        assert messages[0] == "Probing remote items"
+        assert sink.events[0][2:] == (1, 5)
+        assert sink.events[-1][2:] == (5, 5)
+        # Mid ticks are suppressed while the interval window is open.
+        assert len(sink.events) == 2
+
+    def test_overall_progress_grows_without_resetting(self) -> None:
+        sink = RecordingSink()
+        overall = OverallProgress(sink, message="Validating…", interval_s=0.0)
+        overall.add_total(3)
+        overall.tick(message="Phase A")
+        overall.tick()
+        overall.add_total(2)
+        overall.tick(message="Phase B")
+        overall.tick()
+        overall.tick()
+        currents = [current for _stage, _message, current, _total in sink.progress_events]
+        totals = [total for _stage, _message, _current, total in sink.progress_events]
+        assert currents == sorted(currents)
+        assert totals == sorted(totals)
+        assert currents[-1] == 5
+        assert totals[-1] == 5
+        assert sink.events == []

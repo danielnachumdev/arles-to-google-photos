@@ -17,6 +17,10 @@ export function isJobArchivable(status: string): boolean {
   return status === 'done' || status === 'failed' || status === 'cancelled'
 }
 
+export function isJobRestartable(status: string): boolean {
+  return status === 'done' || status === 'failed' || status === 'cancelled'
+}
+
 export function formatJobDuration(seconds: number | null | undefined): string {
   if (seconds == null || !Number.isFinite(seconds) || seconds < 0) {
     return t.missingValue

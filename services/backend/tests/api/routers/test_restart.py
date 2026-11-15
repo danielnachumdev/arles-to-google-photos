@@ -223,15 +223,37 @@ class TestRestartApi(ScrapeFakeSuite):
             assert row["id"] not in old_child_ids
             assert client.get(f"/api/jobs/{row['id']}").json()["parent_job_id"] == new_id
 
-    def test_restart_non_cancelled_is_409(self, tmp_path: Path) -> None:
+    def test_restart_done_scrape_is_new_job(self, tmp_path: Path) -> None:
         client = _client(tmp_path)
         created = client.post(
             "/api/jobs/scrape", json={"url": "https://albums.example/day1"}
         ).json()
         done = _wait_job(client, created["id"])
         response = client.post(f"/api/jobs/{done['id']}/restart", json={})
-        assert response.status_code == 409, response.text
-        assert client.get(f"/api/jobs/{done['id']}").json()["id"] == done["id"]
+        assert response.status_code == 201, response.text
+        new_job = response.json()
+        assert new_job["id"] != done["id"]
+        assert new_job["type"] == "scrape"
+        assert new_job["status"] in {"pending", "running", "done"}
+        assert client.get(f"/api/jobs/{done['id']}").json()["status"] == "done"
+        parsed = _wait_job(client, new_job["id"])
+        assert parsed["status"] == "done"
+
+    def test_restart_failed_preview_is_new_job(self, tmp_path: Path) -> None:
+        client = _client(tmp_path)
+        created = client.post("/api/jobs", files=_mini_multipart())
+        assert created.status_code == 201, created.text
+        done = _wait_job(client, created.json()["id"])
+        job_id = done["id"]
+        client.app.state.deps.store.set_status(job_id, "failed", job_type="preview")
+        restarted = client.post(f"/api/jobs/{job_id}/restart", json={})
+        assert restarted.status_code == 201, restarted.text
+        new_job = restarted.json()
+        assert new_job["id"] != job_id
+        assert new_job["type"] == "preview"
+        parsed = _wait_job(client, new_job["id"])
+        assert parsed["status"] == "done"
+        assert client.get(f"/api/jobs/{job_id}").json()["status"] == "failed"
 
     def test_restart_running_is_409(self, tmp_path: Path) -> None:
         hold = threading.Event()
@@ -246,6 +268,7 @@ class TestRestartApi(ScrapeFakeSuite):
             assert started.wait(timeout=2)
             response = client.post(f"/api/jobs/{created['id']}/restart", json={})
             assert response.status_code == 409, response.text
+            assert response.json()["detail"] == "job is still active"
             assert client.get(f"/api/jobs/{created['id']}").json()["status"] == "running"
         finally:
             hold.set()
@@ -442,14 +465,35 @@ class TestRestartApi(ScrapeFakeSuite):
         assert body["remaining"] == []
         assert preview.id not in [row["id"] for row in body["descendants"]]
 
-    def test_restart_preview_non_cancelled_is_409(self, tmp_path: Path) -> None:
+    def test_restart_preview_done_hub_lists_children(self, tmp_path: Path) -> None:
         client = _client(tmp_path)
         created = client.post(
             "/api/jobs/scrape", json={"url": "https://albums.example/day1"}
         ).json()
         done = _wait_job(client, created["id"])
         response = client.get(f"/api/jobs/{done['id']}/restart-preview")
-        assert response.status_code == 409, response.text
+        assert response.status_code == 200, response.text
+        body = response.json()
+        assert "descendants" in body
+        assert "done" in body
+        assert "remaining" in body
+
+    def test_restart_preview_running_is_409(self, tmp_path: Path) -> None:
+        hold = threading.Event()
+        started = threading.Event()
+        client = _client(
+            tmp_path, scraper=FakeAlbumScraper(hold=hold, started=started)
+        )
+        try:
+            created = client.post(
+                "/api/jobs/scrape", json={"url": "https://albums.example/day1"}
+            ).json()
+            assert started.wait(timeout=2)
+            response = client.get(f"/api/jobs/{created['id']}/restart-preview")
+            assert response.status_code == 409, response.text
+            assert response.json()["detail"] == "job is still active"
+        finally:
+            hold.set()
 
     def test_restart_preview_missing_is_404(self, tmp_path: Path) -> None:
         client = _client(tmp_path)

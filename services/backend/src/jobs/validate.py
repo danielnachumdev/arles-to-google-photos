@@ -10,7 +10,7 @@ from ..export.validate import (
     RemoteAlbumDiscovery,
     compare_indexes,
 )
-from ..progress import JobCancelled, ProgressSink
+from ..progress import JobCancelled, OverallProgress, ProgressSink
 from .cancel import cancellable_sink, store_is_cancelled
 from .persistence.state import ORIGIN_WEB
 from .scraper import validate_scrape_url
@@ -135,15 +135,19 @@ class ValidateService:
             if not scrape_url:
                 raise ValueError("validate url missing")
             sink = self._sink(job_id)
+            overall = OverallProgress(sink, message="Validating…")
             self._events.emit(job_id, "discover", "Discovering remote albums")
             remote, remote_warnings = self._discovery.discover(
-                scrape_url, headers=headers, sink=sink
+                scrape_url, headers=headers, sink=sink, overall=overall
             )
             if store_is_cancelled(self._store, job_id):
                 raise JobCancelled()
             self._events.emit(job_id, "photos", "Indexing Google Photos albums")
             gp = self._gp_factory(token)
-            photos, photos_warnings = self._photos.index(gp, sink=sink)
+            photos, photos_warnings = self._photos.index(
+                gp, sink=sink, overall=overall
+            )
+            overall.tick(0, message="Comparing indexes", force=True)
             if store_is_cancelled(self._store, job_id):
                 raise JobCancelled()
             report = compare_indexes(

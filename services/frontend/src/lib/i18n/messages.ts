@@ -91,6 +91,7 @@ export type MessageCatalog = {
   runHistoryHeading: string
   runHistoryEmpty: string
   technicalLogs: string
+  jobProgressHeading: string
   jobLogLifecycle: (stage: string) => string
   etaLeft: (seconds: number) => string
   viewJob: string

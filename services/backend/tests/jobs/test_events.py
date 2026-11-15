@@ -7,6 +7,7 @@ from src.jobs.events import (
     AUDIENCE_UI,
     KIND_LIFECYCLE,
     KIND_LOG,
+    KIND_PROGRESS,
     JobEvent,
     JobEventBus,
     event_from_dict,
@@ -250,13 +251,21 @@ class TestJobEventBus(EventBusSuite):
         sink.emit("parse", "hrimages/a.jpg", current=1, total=16)
 
         first = _next_event(subscription)
+        first_overall = _next_event(subscription)
         second = _next_event(subscription)
+        second_overall = _next_event(subscription)
         assert first.stage == "scrape"
         assert first.kind == KIND_LOG
         assert first.audience == AUDIENCE_UI
+        assert first_overall.kind == KIND_PROGRESS
+        assert first_overall.current == 0
+        assert first_overall.total == 16
         assert second.stage == "parse"
         assert second.kind == KIND_LOG
         assert second.audience == AUDIENCE_UI
+        assert second_overall.kind == KIND_PROGRESS
+        assert second_overall.current == 1
+        assert second_overall.total == 16
 
     def test_lifecycle_emit_is_not_a_log_line(self) -> None:
         bus = JobEventBus()

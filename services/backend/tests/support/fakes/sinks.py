@@ -11,6 +11,7 @@ class RecordingSink:
         self.events: List[Tuple[str, str, int, int]] = []
         self.extras: List[Optional[Dict[str, Any]]] = []
         self.ops_events: List[Tuple[str, str, int, int]] = []
+        self.progress_events: List[Tuple[str, str, int, int]] = []
 
     def emit(
         self,
@@ -35,3 +36,15 @@ class RecordingSink:
     ) -> None:
         del extra
         self.ops_events.append((stage, message, current, total))
+
+    def progress(
+        self,
+        message: str,
+        *,
+        stage: str = "progress",
+        current: int = 0,
+        total: int = 0,
+        extra: Mapping[str, Any] | None = None,
+    ) -> None:
+        del extra
+        self.progress_events.append((stage, message, current, total))

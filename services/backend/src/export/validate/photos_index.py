@@ -4,7 +4,13 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, List, Optional, Tuple
 
-from ...progress import ProgressSink, emit_progress, raise_if_cancelled
+from ...progress import (
+    OverallProgress,
+    ProgressSink,
+    emit_ops,
+    emit_progress,
+    raise_if_cancelled,
+)
 from ..work_lane import AdaptiveWorkLane, TransientError
 from .models import PhotosAlbumSnapshot, PhotosItemSnapshot
 from .titles import assign_title_ids
@@ -42,6 +48,7 @@ class PhotosAlbumIndexer:
         gp: Any,
         *,
         sink: ProgressSink | None = None,
+        overall: OverallProgress | None = None,
     ) -> Tuple[List[PhotosAlbumSnapshot], List[str]]:
         from gpsdk import Album, MediaItem
 
@@ -63,12 +70,19 @@ class PhotosAlbumIndexer:
                 emit_progress(
                     sink,
                     stage="photos",
-                    message=f"Indexing Photos album: {title or album.id}",
-                    current=i,
-                    total=max(total, 1),
+                    message=(
+                        f"Indexing Photos album {i}/{max(total, 1)}: "
+                        f"{title or album.id}"
+                    ),
                 )
                 items = self._album_items(
-                    gp, album, MediaItem, sink=sink, warnings=warnings, lane=lane
+                    gp,
+                    album,
+                    MediaItem,
+                    sink=sink,
+                    warnings=warnings,
+                    lane=lane,
+                    overall=overall,
                 )
                 built.append((title, album, tuple(items)))
         finally:
@@ -100,17 +114,26 @@ class PhotosAlbumIndexer:
         sink: ProgressSink | None,
         warnings: List[str],
         lane: AdaptiveWorkLane,
+        overall: OverallProgress | None = None,
     ) -> List[PhotosItemSnapshot]:
         media_list = list(MediaItem.search_all(gp, albumId=album.id, pageSize=50))
         raise_if_cancelled(sink)
+        if overall is not None and media_list:
+            overall.add_total(len(media_list))
+            overall.set_message("Probing Photos sizes")
+        emit_progress(
+            sink,
+            stage="photos",
+            message=f"Probing {len(media_list)} Photos size(s)",
+        )
 
         def probe(media: Any) -> PhotosItemSnapshot:
             filename = str(getattr(media, "filename", "") or "")
             item_id = _item_id_from_filename(filename)
-            emit_progress(
+            emit_ops(
                 sink,
+                f"Starting Photos size probe {item_id or filename}",
                 stage="photos",
-                message=f"Starting Photos size probe {item_id or filename}",
             )
             caption = str(getattr(media, "description", "") or "").strip()
             size: Optional[int]
@@ -120,13 +143,16 @@ class PhotosAlbumIndexer:
                 if _photos_is_transient(exc):
                     raise TransientError(str(exc)) from exc
                 size = None
-            return PhotosItemSnapshot(
+            snapshot = PhotosItemSnapshot(
                 item_id=item_id,
                 filename=filename,
                 caption=caption,
                 byte_size=size,
                 media_item_id=str(getattr(media, "id", "") or ""),
             )
+            if overall is not None:
+                overall.tick(message="Probing Photos sizes")
+            return snapshot
 
         items = lane.map([lambda m=media: probe(m) for media in media_list])
         for item in items:

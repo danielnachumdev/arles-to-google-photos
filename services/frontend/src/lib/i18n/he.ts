@@ -94,6 +94,7 @@ export const he: MessageCatalog = {
   runHistoryHeading: 'לוג',
   runHistoryEmpty: 'אין שורות לוג עדיין.',
   technicalLogs: 'לוג טכני',
+  jobProgressHeading: 'התקדמות',
   jobLogLifecycle: (stage) => {
     if (stage === 'preview_ready') {
       return 'התצוגה מוכנה'

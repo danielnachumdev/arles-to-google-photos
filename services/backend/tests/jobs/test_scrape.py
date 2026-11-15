@@ -510,8 +510,16 @@ class TestScrapeService(ScrapeServiceSuite):
 
         preview_events = store.get(preview_id).events
         parent_events = store.get(job_id).events
-        preview_saved = [event for event in preview_events if "Saved hrimages/" in event.message]
-        parent_saved = [event for event in parent_events if "Saved hrimages/" in event.message]
+        preview_saved = [
+            event
+            for event in preview_events
+            if "Saved hrimages/" in event.message and event.kind != "progress"
+        ]
+        parent_saved = [
+            event
+            for event in parent_events
+            if "Saved hrimages/" in event.message and event.kind != "progress"
+        ]
         assert len(preview_saved) == 3
         assert len(parent_saved) == 3
         assert preview_saved[0].current == 1

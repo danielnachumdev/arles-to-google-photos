@@ -8,7 +8,13 @@ from urllib.parse import urljoin, urlparse
 
 from bs4 import BeautifulSoup
 
-from ...progress import ProgressSink, emit_progress, raise_if_cancelled
+from ...progress import (
+    OverallProgress,
+    ProgressSink,
+    emit_ops,
+    emit_progress,
+    raise_if_cancelled,
+)
 from ..scrape.client import FetchError, FetchedResource, HttpClient, UrllibHttpClient
 from ..scrape.detect import (
     ArlesPageInfo,
@@ -63,6 +69,7 @@ class RemoteAlbumDiscovery:
         *,
         headers: Optional[Mapping[str, str]] = None,
         sink: ProgressSink | None = None,
+        overall: OverallProgress | None = None,
     ) -> Tuple[List[RemoteAlbumSnapshot], List[str]]:
         header_map = dict(headers or {})
         queue: List[str] = [root_url.strip()]
@@ -90,55 +97,50 @@ class RemoteAlbumDiscovery:
                 emit_progress(
                     sink,
                     stage="discover",
-                    message=f"Fetching {len(wave)} page(s)",
-                    current=len(visited),
-                    total=max(len(visited), 1),
+                    message=f"Fetching {len(wave)} gallery page(s)",
                 )
+                if overall is not None:
+                    overall.add_total(len(wave))
+                    overall.set_message("Fetching gallery pages")
                 fetched = lane.map(
                     [
                         (
                             lambda url=page_url: self._started_get(
-                                url, header_map, sink=sink
+                                url,
+                                header_map,
+                                sink=sink,
+                                overall=overall,
                             )
                         )
                         for page_url in wave
                     ]
                 )
-                for page_url, (resource, fetch_warning) in zip(wave, fetched):
+                emit_progress(
+                    sink,
+                    stage="discover",
+                    message=f"Fetched {len(wave)} gallery page(s)",
+                )
+                leaf_pages = self._classify_wave(
+                    wave,
+                    fetched,
+                    visited=visited,
+                    queue=queue,
+                    warnings=warnings,
+                    sink=sink,
+                )
+                leaf_total = len(leaf_pages)
+                for index, (resolved, info, content) in enumerate(
+                    leaf_pages, start=1
+                ):
                     raise_if_cancelled(sink)
-                    if resource is None:
-                        if fetch_warning:
-                            warnings.append(fetch_warning)
-                        continue
-                    resolved = resource.url or page_url
-                    info = detect_arles_page(resource.content, page_url=resolved)
-                    if info.kind == ArlesPageKind.UNKNOWN:
-                        warnings.append(
-                            f"Not an Arles gallery page: {resolved} "
-                            f"(kind=unknown, fingerprints="
-                            f"{list(info.fingerprints) or 'none'})"
-                        )
-                        continue
-                    if info.kind in {ArlesPageKind.PARENT, ArlesPageKind.HUB}:
-                        children = resolve_child_gallery_urls(
-                            resolved, info.child_gallery_hrefs
-                        )
-                        if not children:
-                            warnings.append(
-                                f"Hub/parent with no child albums: {resolved}"
-                            )
-                            continue
-                        for child in children:
-                            if _normalize_url(child) not in visited:
-                                queue.append(child)
-                        continue
                     items, leaf_warnings = self._leaf_items(
                         resolved,
                         info,
-                        resource.content,
+                        content,
                         header_map,
                         sink=sink,
                         lane=lane,
+                        overall=overall,
                     )
                     warnings.extend(leaf_warnings)
                     title = (
@@ -146,6 +148,14 @@ class RemoteAlbumDiscovery:
                         or _fallback_title(resolved)
                     )
                     raw_albums.append((title, resolved, tuple(items)))
+                    emit_progress(
+                        sink,
+                        stage="discover",
+                        message=(
+                            f"Remote album {index}/{leaf_total}: {title} "
+                            f"({len(items)} items)"
+                        ),
+                    )
         finally:
             if own_lane:
                 lane.close(wait=True)
@@ -164,6 +174,48 @@ class RemoteAlbumDiscovery:
             for i, (title, url, items) in enumerate(raw_albums)
         ], warnings
 
+    def _classify_wave(
+        self,
+        wave: List[str],
+        fetched: List[Tuple[Optional[FetchedResource], Optional[str]]],
+        *,
+        visited: Set[str],
+        queue: List[str],
+        warnings: List[str],
+        sink: ProgressSink | None,
+    ) -> List[Tuple[str, ArlesPageInfo, bytes]]:
+        leaf_pages: List[Tuple[str, ArlesPageInfo, bytes]] = []
+        for page_url, (resource, fetch_warning) in zip(wave, fetched):
+            raise_if_cancelled(sink)
+            if resource is None:
+                if fetch_warning:
+                    warnings.append(fetch_warning)
+                continue
+            resolved = resource.url or page_url
+            info = detect_arles_page(resource.content, page_url=resolved)
+            if info.kind == ArlesPageKind.UNKNOWN:
+                warnings.append(
+                    f"Not an Arles gallery page: {resolved} "
+                    f"(kind=unknown, fingerprints="
+                    f"{list(info.fingerprints) or 'none'})"
+                )
+                continue
+            if info.kind in {ArlesPageKind.PARENT, ArlesPageKind.HUB}:
+                children = resolve_child_gallery_urls(
+                    resolved, info.child_gallery_hrefs
+                )
+                if not children:
+                    warnings.append(
+                        f"Hub/parent with no child albums: {resolved}"
+                    )
+                    continue
+                for child in children:
+                    if _normalize_url(child) not in visited:
+                        queue.append(child)
+                continue
+            leaf_pages.append((resolved, info, resource.content))
+        return leaf_pages
+
     def _leaf_items(
         self,
         index_url: str,
@@ -173,27 +225,28 @@ class RemoteAlbumDiscovery:
         *,
         sink: ProgressSink | None,
         lane: AdaptiveWorkLane,
+        overall: OverallProgress | None = None,
     ) -> Tuple[List[RemoteItemSnapshot], List[str]]:
         refs = self._merge_index_items(
-            index_url, info, start_content, headers, sink, lane
+            index_url, info, start_content, headers, sink, lane, overall=overall
         )
         warnings: List[str] = []
-        total = len(refs)
+        if overall is not None and refs:
+            overall.add_total(len(refs))
+            overall.set_message("Probing remote items")
         emit_progress(
             sink,
             stage="discover",
-            message=f"Inspecting {total} item(s)",
-            current=0,
-            total=max(total, 1),
+            message=f"Probing {len(refs)} remote item(s)",
         )
 
         def inspect(item: GalleryItemRef) -> RemoteItemSnapshot:
             # Runs inside the lane worker — call HTTP client directly (no nested
             # lane.submit) so we cannot deadlock on the shared worker pool.
-            emit_progress(
+            emit_ops(
                 sink,
+                f"Starting remote item {item.item_id}",
                 stage="discover",
-                message=f"Starting remote item {item.item_id}",
             )
             page_url = urljoin(index_url, item.image_page_href)
             page_html, caption = self._fetch_caption(page_url, headers)
@@ -204,12 +257,15 @@ class RemoteAlbumDiscovery:
                 page_html=page_html or b"",
                 headers=headers,
             )
-            return RemoteItemSnapshot(
+            snapshot = RemoteItemSnapshot(
                 item_id=item.item_id,
                 caption=(caption or "").strip(),
                 byte_size=size,
                 media_url=media_url,
             )
+            if overall is not None:
+                overall.tick(message="Probing remote items")
+            return snapshot
 
         snapshots = lane.map([lambda item=item: inspect(item) for item in refs])
         for snap in snapshots:
@@ -227,6 +283,8 @@ class RemoteAlbumDiscovery:
         headers: Mapping[str, str],
         sink: ProgressSink | None,
         lane: AdaptiveWorkLane,
+        *,
+        overall: OverallProgress | None = None,
     ) -> List[GalleryItemRef]:
         page_entries: Dict[str, Tuple[int, str, Tuple[GalleryItemRef, ...]]] = {}
         start_key = _normalize_url(index_url)
@@ -251,11 +309,14 @@ class RemoteAlbumDiscovery:
                 wave.append(page_url)
             if not wave:
                 break
+            if overall is not None:
+                overall.add_total(len(wave))
+                overall.set_message("Fetching index pages")
             fetched = lane.map(
                 [
                     (
                         lambda url=page_url: self._started_try_get(
-                            url, headers, sink=sink
+                            url, headers, sink=sink, overall=overall
                         )
                     )
                     for page_url in wave
@@ -350,9 +411,13 @@ class RemoteAlbumDiscovery:
         headers: Mapping[str, str],
         *,
         sink: ProgressSink | None,
+        overall: OverallProgress | None = None,
     ) -> Tuple[Optional[FetchedResource], Optional[str]]:
-        emit_progress(sink, stage="discover", message=f"Starting fetch {url}")
-        return self._get_page(url, headers)
+        emit_ops(sink, f"Starting fetch {url}", stage="discover")
+        result = self._get_page(url, headers)
+        if overall is not None:
+            overall.tick(message="Fetching gallery pages")
+        return result
 
     def _started_try_get(
         self,
@@ -360,11 +425,13 @@ class RemoteAlbumDiscovery:
         headers: Mapping[str, str],
         *,
         sink: ProgressSink | None,
+        overall: OverallProgress | None = None,
     ) -> Optional[FetchedResource]:
-        emit_progress(
-            sink, stage="discover", message=f"Starting index page {url}"
-        )
-        return self._try_get(url, headers)
+        emit_ops(sink, f"Starting index page {url}", stage="discover")
+        result = self._try_get(url, headers)
+        if overall is not None:
+            overall.tick(message="Fetching index pages")
+        return result
 
     def _get_page(
         self, url: str, headers: Mapping[str, str]

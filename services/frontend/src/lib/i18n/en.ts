@@ -96,6 +96,7 @@ export const en: MessageCatalog = {
   runHistoryHeading: 'Logs',
   runHistoryEmpty: 'No log lines yet.',
   technicalLogs: 'Technical logs',
+  jobProgressHeading: 'Progress',
   jobLogLifecycle: (stage) => {
     if (stage === 'preview_ready') {
       return 'Preview ready'

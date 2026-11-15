@@ -350,9 +350,9 @@ describe('JobDetail', () => {
       }),
     )
 
-    expect(await screen.findByText('Starting upload')).toBeInTheDocument()
+    expect(await screen.findAllByText('Starting upload')).toHaveLength(2)
     expect(screen.queryByText('publish')).not.toBeInTheDocument()
-    expect(screen.getByText('0/3')).toBeInTheDocument()
+    expect(screen.getAllByText('0/3').length).toBeGreaterThanOrEqual(1)
   })
 
   it('hides ops lines until technical logs are enabled', async () => {
@@ -410,12 +410,12 @@ describe('JobDetail', () => {
     )
 
     expect(await screen.findByText('Writing upload')).toBeInTheDocument()
-    expect(screen.getByText(/Saved hrimages\/20120802_01hr.JPG/)).toBeInTheDocument()
+    expect(screen.getAllByText(/Saved hrimages\/20120802_01hr.JPG/).length).toBeGreaterThanOrEqual(1)
     expect(screen.queryByText(/812KB/)).not.toBeInTheDocument()
     expect(screen.queryByText(/Fetching image page/)).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('checkbox', { name: t.technicalLogs }))
     expect(screen.getByText(/812KB/)).toBeInTheDocument()
-    expect(screen.getByText(/Fetching image page/)).toBeInTheDocument()
+    expect(screen.getAllByText(/Fetching image page/).length).toBeGreaterThanOrEqual(1)
     expect(screen.queryByText('scrape')).not.toBeInTheDocument()
   })
 
@@ -1174,14 +1174,20 @@ describe('JobDetail', () => {
     )
 
     expect(
-      await screen.findByText('Saved hrimages/20120802_02hr.JPG · 2/16 · 812 KB · ~1m 20s left'),
-    ).toBeInTheDocument()
-    expect(screen.getAllByText(/^\d+\/16$/).map((node) => node.textContent)).toEqual(['1/16', '2/16'])
+      await screen.findAllByText(
+        'Saved hrimages/20120802_02hr.JPG · 2/16 · 812 KB · ~1m 20s left',
+      ),
+    ).not.toHaveLength(0)
+    expect(screen.getAllByText(/^\d+\/16$/).map((node) => node.textContent)).toEqual([
+      '2/16',
+      '1/16',
+      '2/16',
+    ])
     expect(document.querySelector('.job-detail__eta')).toHaveTextContent(t.etaLeft(80))
-    expect(document.querySelectorAll('.job-detail__eta')).toHaveLength(1)
+    expect(document.querySelectorAll('.job-detail__eta')).toHaveLength(2)
   })
 
-  it('hides cancel on a finished job', async () => {
+  it('hides cancel and shows restart on a finished job', async () => {
     render(
       <MemoryRouter>
         <JobDetail jobId="job-summer" />
@@ -1190,7 +1196,7 @@ describe('JobDetail', () => {
 
     await screen.findByText(jobStatusLabel('done'))
     expect(screen.queryByRole('button', { name: t.cancelJob })).not.toBeInTheDocument()
-    expect(screen.queryByRole('button', { name: t.restartJob })).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: t.restartJob })).toBeInTheDocument()
   })
 
   it('shows Waiting with Cancel, no Restart, and warnings', async () => {
@@ -1230,7 +1236,7 @@ describe('JobDetail', () => {
     expect(screen.getByText('Child #12 failed: site down')).toBeInTheDocument()
   })
 
-  it('shows restart only when cancelled and navigates to the new job', async () => {
+  it('shows restart when cancelled and navigates to the new job', async () => {
     const cancelled: Job = {
       id: 'job-cancelled',
       number: 12,
@@ -1484,7 +1490,7 @@ describe('JobDetail', () => {
         <JobDetail jobId={scrapeJob.id} />
       </MemoryRouter>,
     )
-    expect(await screen.findByText('Saved file')).toBeInTheDocument()
+    expect(await screen.findAllByText('Saved file')).not.toHaveLength(0)
     expect(document.querySelector('.job-detail__eta')).toHaveTextContent(t.etaLeft(45))
   })
 

@@ -11,13 +11,14 @@ PersistHook = Callable[[str, "JobEvent"], Any]
 
 KIND_LOG = "log"
 KIND_LIFECYCLE = "lifecycle"
+KIND_PROGRESS = "progress"
 AUDIENCE_UI = "ui"
 AUDIENCE_OPS = "ops"
 
 LIFECYCLE_STAGES = frozenset(
     {"done", "error", "failed", "cancelled", "preview_ready", "child", "waiting"}
 )
-_KIND_ALIASES = {"progress": KIND_LIFECYCLE}
+_KNOWN_KINDS = frozenset({KIND_LOG, KIND_LIFECYCLE, KIND_PROGRESS})
 
 
 def _parse_occurred_at(raw: Optional[Any]) -> datetime:
@@ -32,9 +33,7 @@ def _parse_occurred_at(raw: Optional[Any]) -> datetime:
 def infer_event_kind(stage: str, kind: Optional[str] = None) -> str:
     if kind:
         normalized = str(kind).strip().lower()
-        if normalized in _KIND_ALIASES:
-            return _KIND_ALIASES[normalized]
-        if normalized in {KIND_LOG, KIND_LIFECYCLE}:
+        if normalized in _KNOWN_KINDS:
             return normalized
     if str(stage or "") in LIFECYCLE_STAGES:
         return KIND_LIFECYCLE
@@ -59,7 +58,8 @@ def filter_events_by_audience(
     return [
         event
         for event in events
-        if event.kind == KIND_LIFECYCLE or event.audience != AUDIENCE_OPS
+        if event.kind in {KIND_LIFECYCLE, KIND_PROGRESS}
+        or event.audience != AUDIENCE_OPS
     ]
 
 
@@ -168,6 +168,27 @@ class JobLogger:
             audience=AUDIENCE_OPS,
         )
 
+    def progress(
+        self,
+        message: str,
+        *,
+        stage: str = "progress",
+        current: int = 0,
+        total: int = 0,
+        extra: Optional[Mapping[str, Any]] = None,
+    ) -> JobEvent:
+        """Overall job estimate for the sticky progress strip (not a log line)."""
+        return self.bus.emit(
+            self.job_id,
+            stage,
+            message,
+            current=current,
+            total=total,
+            extra=dict(extra) if extra is not None else None,
+            kind=KIND_PROGRESS,
+            audience=AUDIENCE_UI,
+        )
+
     def emit(
         self,
         stage: str,
@@ -177,7 +198,7 @@ class JobLogger:
         total: int = 0,
         extra: Optional[Mapping[str, Any]] = None,
     ) -> None:
-        """``ProgressSink``: user-facing log line (not a lifecycle stage)."""
+        """``ProgressSink``: user-facing log line; mirrors countable work as overall progress."""
         self.ui(
             message,
             stage=stage,
@@ -185,6 +206,14 @@ class JobLogger:
             total=total,
             extra=extra,
         )
+        if total > 0:
+            self.progress(
+                message,
+                stage=stage,
+                current=current,
+                total=total,
+                extra=extra,
+            )
 
 
 JobProgressSink = JobLogger
