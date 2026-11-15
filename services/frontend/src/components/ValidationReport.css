@@ -87,6 +87,20 @@
   justify-content: space-between;
 }
 
+.validation-report__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  font-size: 0.85rem;
+  color: var(--color-muted, #5c6570);
+  cursor: pointer;
+  user-select: none;
+}
+
+.validation-report__option input {
+  margin: 0;
+}
+
 .validation-report__filters {
   display: flex;
   flex-wrap: wrap;

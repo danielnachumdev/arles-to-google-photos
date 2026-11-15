@@ -5,6 +5,7 @@ import {
   defaultValidationAlbumKey,
   filterValidationAlbums,
   formatValidationValue,
+  withValidationViewOptions,
   type ValidationAlbumEntry,
   type ValidationAlbumFilter,
 } from '../lib/validationAlbums.ts'
@@ -280,20 +281,38 @@ function filterLabel(filter: ValidationAlbumFilter): string {
 }
 
 export function ValidationReportView({ report }: { report: Report }) {
-  const summary = report.summary ?? {}
-  const entries = useMemo(() => buildValidationAlbumEntries(report), [report])
+  const [suppressRemoteSmallerSizes, setSuppressRemoteSmallerSizes] = useState(false)
+  const viewReport = useMemo(
+    () =>
+      withValidationViewOptions(report, {
+        suppressRemoteSmallerSizes,
+      }),
+    [report, suppressRemoteSmallerSizes],
+  )
+  const summary = viewReport.summary ?? {}
+  const entries = useMemo(() => buildValidationAlbumEntries(viewReport), [viewReport])
   const [filter, setFilter] = useState<ValidationAlbumFilter>(
     report.identical ? 'all' : 'issues',
   )
   const [query, setQuery] = useState('')
   const [selectedKey, setSelectedKey] = useState<string | null>(() =>
-    defaultValidationAlbumKey(entries),
+    defaultValidationAlbumKey(buildValidationAlbumEntries(report)),
   )
 
   const visible = useMemo(
     () => filterValidationAlbums(entries, filter, query),
     [entries, filter, query],
   )
+
+  useEffect(() => {
+    if (
+      filter === 'issues' &&
+      entries.length > 0 &&
+      !entries.some((entry) => entry.hasIssues)
+    ) {
+      setFilter('all')
+    }
+  }, [entries, filter])
 
   useEffect(() => {
     if (selectedKey && visible.some((entry) => entry.key === selectedKey)) {
@@ -310,13 +329,13 @@ export function ValidationReportView({ report }: { report: Report }) {
         <h2 className="validation-report__heading">{t.validationReportHeading}</h2>
         <p
           className={
-            report.identical
+            viewReport.identical
               ? 'validation-report__verdict validation-report__verdict--ok'
               : 'validation-report__verdict validation-report__verdict--diff'
           }
           dir="auto"
         >
-          {report.identical ? t.validationIdentical : t.validationDifferences}
+          {viewReport.identical ? t.validationIdentical : t.validationDifferences}
         </p>
         <ul className="validation-report__summary">
           <li>{t.validationSummaryMatched(summary.matched ?? 0)}</li>
@@ -324,18 +343,18 @@ export function ValidationReportView({ report }: { report: Report }) {
           <li>{t.validationSummaryOnlyPhotos(summary.only_photos ?? 0)}</li>
           <li>{t.validationSummaryMismatches(summary.content_mismatches ?? 0)}</li>
         </ul>
-        {report.root_url ? (
+        {viewReport.root_url ? (
           <p className="validation-report__root" dir="ltr">
-            <a href={report.root_url} target="_blank" rel="noreferrer">
-              {report.root_url}
+            <a href={viewReport.root_url} target="_blank" rel="noreferrer">
+              {viewReport.root_url}
             </a>
           </p>
         ) : null}
-        {report.warnings && report.warnings.length > 0 ? (
+        {viewReport.warnings && viewReport.warnings.length > 0 ? (
           <details className="validation-report__warnings">
-            <summary>{t.validationWarningsHeading(report.warnings.length)}</summary>
+            <summary>{t.validationWarningsHeading(viewReport.warnings.length)}</summary>
             <ul>
-              {report.warnings.map((warning) => (
+              {viewReport.warnings.map((warning) => (
                 <li key={warning} dir="auto">
                   {warning}
                 </li>
@@ -365,6 +384,14 @@ export function ValidationReportView({ report }: { report: Report }) {
             </button>
           ))}
         </div>
+        <label className="validation-report__option">
+          <input
+            type="checkbox"
+            checked={suppressRemoteSmallerSizes}
+            onChange={(event) => setSuppressRemoteSmallerSizes(event.target.checked)}
+          />
+          <span>{t.validationSuppressRemoteSmallerSizes}</span>
+        </label>
         <label className="validation-report__search-label">
           <span className="visually-hidden">{t.validationSearchLabel}</span>
           <input

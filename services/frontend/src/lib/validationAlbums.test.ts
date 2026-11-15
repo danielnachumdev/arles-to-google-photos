@@ -5,7 +5,9 @@ import {
   defaultValidationAlbumKey,
   filterValidationAlbums,
   formatValidationValue,
+  isRemoteSmallerSizeMismatch,
   matchedIssueCount,
+  withValidationViewOptions,
 } from './validationAlbums.ts'
 
 const sampleReport: ValidationReport = {
@@ -117,5 +119,121 @@ describe('validationAlbums', () => {
     expect(formatValidationValue(512)).toBe('512 B')
     expect(formatValidationValue(2048)).toBe('2.0 KB')
     expect(formatValidationValue('1048576')).toBe('1.0 MB')
+  })
+
+  it('detects remote-smaller size mismatches only', () => {
+    expect(
+      isRemoteSmallerSizeMismatch({
+        item_id: 'a',
+        field: 'size',
+        remote: 100,
+        photos: 200,
+      }),
+    ).toBe(true)
+    expect(
+      isRemoteSmallerSizeMismatch({
+        item_id: 'a',
+        field: 'size',
+        remote: 300,
+        photos: 200,
+      }),
+    ).toBe(false)
+    expect(
+      isRemoteSmallerSizeMismatch({
+        item_id: 'a',
+        field: 'caption',
+        remote: 'x',
+        photos: 'y',
+      }),
+    ).toBe(false)
+  })
+
+  it('suppresses remote-smaller size diffs and recomputes identical', () => {
+    const sizedOnly: ValidationReport = {
+      root_url: 'https://example.com/',
+      identical: false,
+      summary: {
+        matched: 1,
+        only_remote: 0,
+        only_photos: 0,
+        content_mismatches: 1,
+      },
+      matched: [
+        {
+          title_id: 'day1',
+          title: 'Day 1',
+          remote_url: 'https://example.com/day1/',
+          photos_album_id: 'ph',
+          photos_product_url: 'https://photos.google.com/lr/album/ph',
+          identical: false,
+          mismatches: [
+            {
+              item_id: '20120802_01',
+              field: 'size',
+              remote: 2048,
+              photos: 4096,
+            },
+            {
+              item_id: '20120802_02',
+              field: 'size',
+              remote: 9000,
+              photos: 1000,
+            },
+            {
+              item_id: '20120802_03',
+              field: 'caption',
+              remote: 'a',
+              photos: 'b',
+            },
+          ],
+        },
+      ],
+    }
+
+    const viewed = withValidationViewOptions(sizedOnly, {
+      suppressRemoteSmallerSizes: true,
+    })
+    expect(viewed.matched?.[0]?.mismatches).toEqual([
+      {
+        item_id: '20120802_02',
+        field: 'size',
+        remote: 9000,
+        photos: 1000,
+      },
+      {
+        item_id: '20120802_03',
+        field: 'caption',
+        remote: 'a',
+        photos: 'b',
+      },
+    ])
+    expect(viewed.matched?.[0]?.identical).toBe(false)
+    expect(viewed.summary.content_mismatches).toBe(1)
+    expect(viewed.identical).toBe(false)
+
+    const onlySmaller: ValidationReport = {
+      ...sizedOnly,
+      matched: [
+        {
+          ...sizedOnly.matched![0]!,
+          mismatches: [
+            {
+              item_id: '20120802_01',
+              field: 'size',
+              remote: 2048,
+              photos: 4096,
+            },
+          ],
+        },
+      ],
+    }
+    const cleared = withValidationViewOptions(onlySmaller, {
+      suppressRemoteSmallerSizes: true,
+    })
+    expect(cleared.identical).toBe(true)
+    expect(cleared.matched?.[0]?.identical).toBe(true)
+    expect(cleared.matched?.[0]?.mismatches).toEqual([])
+    expect(cleared.summary.content_mismatches).toBe(0)
+    expect(buildValidationAlbumEntries(cleared)[0]?.hasIssues).toBe(false)
   })
 })

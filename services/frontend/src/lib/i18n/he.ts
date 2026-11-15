@@ -212,6 +212,7 @@ export const he: MessageCatalog = {
   validationFilterAll: 'הכול',
   validationFilterIssues: 'עם הבדלים',
   validationFilterAria: 'סינון אלבומים',
+  validationSuppressRemoteSmallerSizes: 'התעלם מקבצים קטנים יותר באתר המרוחק',
   validationSearchLabel: 'חיפוש אלבומים',
   validationSearchPlaceholder: 'חיפוש לפי כותרת אלבום…',
   validationAlbumListAria: 'אלבומים בדוח זה',

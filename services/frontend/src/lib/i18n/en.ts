@@ -217,6 +217,7 @@ export const en: MessageCatalog = {
   validationFilterAll: 'All',
   validationFilterIssues: 'With differences',
   validationFilterAria: 'Filter albums',
+  validationSuppressRemoteSmallerSizes: 'Ignore smaller remote file sizes',
   validationSearchLabel: 'Search albums',
   validationSearchPlaceholder: 'Search by album title…',
   validationAlbumListAria: 'Albums in this report',

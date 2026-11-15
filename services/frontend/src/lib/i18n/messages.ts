@@ -174,6 +174,7 @@ export type MessageCatalog = {
   validationFilterAll: string
   validationFilterIssues: string
   validationFilterAria: string
+  validationSuppressRemoteSmallerSizes: string
   validationSearchLabel: string
   validationSearchPlaceholder: string
   validationAlbumListAria: string

@@ -1,4 +1,5 @@
 import type {
+  ValidationItemMismatch,
   ValidationMatchedAlbum,
   ValidationReport,
   ValidationSideAlbum,
@@ -13,6 +14,11 @@ export type ValidationAlbumFilter =
   | 'only_remote'
   | 'only_photos'
 
+export type ValidationViewOptions = {
+  /** Hide size mismatches when remote bytes < Photos bytes (common lower-res remote). */
+  suppressRemoteSmallerSizes?: boolean
+}
+
 export type ValidationAlbumEntry = {
   key: string
   kind: ValidationAlbumKind
@@ -23,6 +29,59 @@ export type ValidationAlbumEntry = {
   itemCount: number | null
   matched: ValidationMatchedAlbum | null
   side: ValidationSideAlbum | null
+}
+
+export function isRemoteSmallerSizeMismatch(mismatch: ValidationItemMismatch): boolean {
+  if (mismatch.field !== 'size') {
+    return false
+  }
+  const remote = asFiniteNumber(mismatch.remote)
+  const photos = asFiniteNumber(mismatch.photos)
+  return remote != null && photos != null && remote < photos
+}
+
+export function withValidationViewOptions(
+  report: ValidationReport,
+  options: ValidationViewOptions = {},
+): ValidationReport {
+  if (!options.suppressRemoteSmallerSizes) {
+    return report
+  }
+  const matched = (report.matched ?? []).map((album) => {
+    const mismatches = (album.mismatches ?? []).filter(
+      (row) => !isRemoteSmallerSizeMismatch(row),
+    )
+    const identical =
+      (album.only_remote_items?.length ?? 0) === 0 &&
+      (album.only_photos_items?.length ?? 0) === 0 &&
+      mismatches.length === 0
+    return {
+      ...album,
+      mismatches,
+      identical,
+    }
+  })
+  const onlyRemote = report.only_remote ?? []
+  const onlyPhotos = report.only_photos ?? []
+  const contentMismatches = matched.filter((album) => !album.identical).length
+  const identical =
+    (onlyRemote.length === 0 &&
+      onlyPhotos.length === 0 &&
+      contentMismatches === 0 &&
+      matched.length > 0) ||
+    (matched.length === 0 && onlyRemote.length === 0 && onlyPhotos.length === 0)
+  return {
+    ...report,
+    identical,
+    summary: {
+      ...(report.summary ?? {}),
+      matched: matched.length,
+      only_remote: onlyRemote.length,
+      only_photos: onlyPhotos.length,
+      content_mismatches: contentMismatches,
+    },
+    matched,
+  }
 }
 
 export function matchedIssueCount(album: ValidationMatchedAlbum): number {
@@ -136,4 +195,19 @@ function formatByteSize(size: number): string {
     return `${(size / 1024).toFixed(size < 10 * 1024 ? 1 : 0)} KB`
   }
   return `${(size / (1024 * 1024)).toFixed(1)} MB`
+}
+
+function asFiniteNumber(value: unknown): number | null {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim()
+    if (!trimmed || !/^-?\d+(\.\d+)?$/.test(trimmed)) {
+      return null
+    }
+    const parsed = Number(trimmed)
+    return Number.isFinite(parsed) ? parsed : null
+  }
+  return null
 }

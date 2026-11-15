@@ -140,4 +140,55 @@ describe('ValidationReportView', () => {
     fireEvent.click(within(details as HTMLElement).getByText('1 warning during discovery'))
     expect(screen.getByText('Skipped decoy page')).toBeInTheDocument()
   })
+
+  it('can ignore smaller remote file size mismatches', () => {
+    const sizeOnly: ValidationReport = {
+      root_url: 'https://example.com/gallery/',
+      identical: false,
+      summary: {
+        matched: 1,
+        only_remote: 0,
+        only_photos: 0,
+        content_mismatches: 1,
+      },
+      matched: [
+        {
+          title_id: 'day1',
+          title: 'Demo Day 1',
+          remote_url: 'https://example.com/gallery/day1/',
+          photos_album_id: 'ph-day1',
+          photos_product_url: 'https://photos.google.com/lr/album/ph-day1',
+          identical: false,
+          mismatches: [
+            {
+              item_id: '20120802_03',
+              field: 'size',
+              remote: 2048,
+              photos: 4096,
+            },
+          ],
+        },
+      ],
+    }
+
+    render(<ValidationReportView report={sizeOnly} />)
+
+    expect(
+      screen.getByText('Differences found between remote and Photos.'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('2.0 KB')).toBeInTheDocument()
+    expect(screen.getByText('4.0 KB')).toBeInTheDocument()
+
+    fireEvent.click(
+      screen.getByRole('checkbox', { name: 'Ignore smaller remote file sizes' }),
+    )
+
+    expect(
+      screen.getByText('Remote tree matches app-created Photos albums.'),
+    ).toBeInTheDocument()
+    expect(screen.getByText('0 with content differences')).toBeInTheDocument()
+    expect(screen.getByRole('tab', { name: 'All' })).toHaveAttribute('aria-selected', 'true')
+    expect(screen.getByText('Remote and Photos match for this album.')).toBeInTheDocument()
+    expect(screen.queryByText('2.0 KB')).not.toBeInTheDocument()
+  })
 })
