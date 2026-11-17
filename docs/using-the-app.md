@@ -22,18 +22,22 @@ Check:
 - Each photo or video title
 - Trip date vs file modified time (folder imports may warn if they disagree)
 
-Click a thumbnail to open a larger preview. **Videos** play in the same dialog (controls + poster) when a browser-playable copy exists; otherwise you will see that the video cannot be played in the browser yet. Titles and order still publish.
+Click a thumbnail to open a larger preview. The desk stays **thumb-first**: full originals / full video bodies are not hydrated just to edit titles. **Videos** show a poster (and a short derived preview when one exists); titles and order still publish.
 
 **Save** writes your edits on the server. They stay with this preview job. Google Photos is unchanged until you publish.
+
+### Large albums
+
+If any file is over **256 MiB** or the album media totals over **1 GiB**, the UI treats the album as **large**: thumb-only workbench, sequential/resumable publish messaging, and a hard reject/warn for a single file above **~1.5 GiB** (Cloud Run memory budget). Small albums keep the same publish path (streamed) without the large-album warnings.
 
 ## Publish
 
 1. Click **Publish** (needs [Google Photos access](google-photos.md)).
 2. Sign in in the **browser popup**.
-3. A **new upload job** runs. The preview job stays a preview.
+3. A **new upload job** runs. Items upload **one at a time** (streamed); the preview job stays a preview.
 4. Open the Google Photos link when the job finishes.
 
-**Publish again** creates another independent Photos album. It does not overwrite the previous one.
+If publish is interrupted, **restart / remaining** skips items already created in Photos (checkpoints on the upload job). **Publish again** creates another independent Photos album and does not overwrite the previous one.
 
 ## Validate vs Photos
 

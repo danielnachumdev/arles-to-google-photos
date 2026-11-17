@@ -2,9 +2,19 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any, Callable, Optional, Protocol
+from typing import Any, Callable, Dict, Optional, Protocol
 
 from ..export.preview import AlbumPreview
+from ..export.publish_checkpoint import (
+    PHOTOS_ALBUM_ID_KEY,
+    PHOTOS_ALBUM_TITLE_KEY,
+    PHOTOS_ALBUM_URL_KEY,
+    checkpoint_item,
+    created_item_ids,
+    merge_extra,
+    resume_album_fields,
+)
+from ..export.publisher import album_from_checkpoint
 from ..progress import JobCancelled
 from .cancel import cancellable_sink, store_is_cancelled
 from .events import JobEventBus
@@ -15,6 +25,7 @@ from .store import (
     STATUS_RUNNING,
     TYPE_UPLOAD,
     JobNotFoundError,
+    parse_extra,
 )
 
 
@@ -24,6 +35,7 @@ class _JobLike(Protocol):
     status: str
     type: str
     preview: Optional[AlbumPreview]
+    extra: Optional[Dict[str, Any]]
 
 
 class _StoreLike(Protocol):
@@ -41,6 +53,7 @@ class _StoreLike(Protocol):
         source_id: str,
         *,
         parent_job_id: Optional[str] = None,
+        extra: Optional[Dict[str, Any]] = None,
     ) -> _JobLike:
         ...
 
@@ -60,6 +73,9 @@ class _StoreLike(Protocol):
     def retains_full_local_tree(self) -> bool:
         ...
 
+    def update_extra(self, job_id: str, extra: Optional[Dict[str, Any]]) -> _JobLike:
+        ...
+
 
 class _PublisherLike(Protocol):
     def publish(
@@ -71,6 +87,10 @@ class _PublisherLike(Protocol):
         *,
         resolve: Any = None,
         release: Any = None,
+        skip_item_ids: Any = None,
+        resume_album: Any = None,
+        on_item_checkpoint: Any = None,
+        on_album: Any = None,
     ) -> Any:
         ...
 
@@ -103,10 +123,14 @@ class PublishService:
         *,
         access_token: str,
         parent_job_id: Optional[str] = None,
+        extra: Optional[Dict[str, Any]] = None,
     ) -> str:
         """Start upload as pending and enqueue finish. Returns the upload id."""
         upload_id = self.start(
-            source_id, access_token=access_token, parent_job_id=parent_job_id
+            source_id,
+            access_token=access_token,
+            parent_job_id=parent_job_id,
+            extra=extra,
         )
         token = access_token
         if self._submit is not None:
@@ -123,6 +147,7 @@ class PublishService:
         *,
         access_token: str,
         parent_job_id: Optional[str] = None,
+        extra: Optional[Dict[str, Any]] = None,
     ) -> str:
         try:
             job = self._store.get(source_id)
@@ -141,16 +166,17 @@ class PublishService:
 
         if parent_job_id:
             upload = self._store.create_upload_from(
-                source_id, parent_job_id=parent_job_id
+                source_id, parent_job_id=parent_job_id, extra=extra
             )
         else:
-            upload = self._store.create_upload_from(source_id)
+            upload = self._store.create_upload_from(source_id, extra=extra)
         total = len(upload.preview.items) if upload.preview is not None else 0
+        skipped = len(created_item_ids(getattr(upload, "extra", None)))
         self._events.emit(
             upload.id,
             "publish",
-            "Starting upload",
-            current=0,
+            "Starting upload" if skipped == 0 else f"Resuming upload ({skipped} done)",
+            current=skipped,
             total=total,
         )
         if parent_job_id:
@@ -200,6 +226,43 @@ class PublishService:
                     except OSError:
                         pass
 
+            def on_item_checkpoint(
+                item_id: str, status: str, fields: Dict[str, Any]
+            ) -> None:
+                current = self._store.get(upload_id)
+                updated = checkpoint_item(
+                    parse_extra(current.extra), item_id, status, fields
+                )
+                self._store.update_extra(upload_id, updated)
+
+            def on_album(album: Any) -> None:
+                current = self._store.get(upload_id)
+                patch = {
+                    PHOTOS_ALBUM_ID_KEY: str(getattr(album, "id", "") or ""),
+                    PHOTOS_ALBUM_URL_KEY: str(
+                        getattr(album, "productUrl", "") or ""
+                    ),
+                    PHOTOS_ALBUM_TITLE_KEY: str(
+                        getattr(album, "title", "")
+                        or (job.preview.title if job.preview else "")
+                    ),
+                }
+                self._store.update_extra(
+                    upload_id, merge_extra(parse_extra(current.extra), patch)
+                )
+
+            skip_ids = created_item_ids(parse_extra(job.extra))
+            resume = None
+            album_fields = resume_album_fields(parse_extra(job.extra))
+            if album_fields is not None and skip_ids:
+                resume = album_from_checkpoint(
+                    gp,
+                    album_id=album_fields["album_id"],
+                    title=album_fields["title"]
+                    or (job.preview.title if job.preview else ""),
+                    product_url=album_fields["product_url"],
+                )
+
             album = self._publisher.publish(
                 gp,
                 album_root,
@@ -209,10 +272,16 @@ class PublishService:
                 ),
                 resolve=resolve,
                 release=release,
+                skip_item_ids=skip_ids,
+                resume_album=resume,
+                on_item_checkpoint=on_item_checkpoint,
+                on_album=on_album,
             )
             if store_is_cancelled(self._store, upload_id):
                 raise JobCancelled()
             url = getattr(album, "productUrl", "") or ""
+            if not url and album_fields is not None:
+                url = album_fields.get("product_url") or ""
             self._store.mark_done(upload_id, url)
             self._events.emit(
                 upload_id,

@@ -17,3 +17,6 @@ class ScrapeResult:
     album_root: Path
     child_gallery_urls: Tuple[str, ...]
     gallery_title: Optional[str]
+    size_class: Optional[str] = None
+    total_media_bytes: int = 0
+    max_media_bytes: int = 0

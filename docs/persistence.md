@@ -37,6 +37,17 @@ When the mirror is on:
 
 `job.json` / `events.json` are **not** uploaded to GCS (legacy json StateStore / local cache only).
 
+### GCS as staging (not Google Photos)
+
+Album bytes stage in the artifact store **before** Google Photos:
+
+1. **Ingest** — folder multipart and scrape HR downloads stream **one file at a time** into the store (`put_file` / `materialize_album_tree`). Cloud scratch keeps media as **sparse placeholders** after upload; HTML/structure stays local for parse.
+2. **Preview / edit** — UI and media routes prefer **thumbnails** (and short derived video posters). Opening the desk must not auto-hydrate multi‑GiB `hrimages/` / full `play` bodies into the instance.
+3. **Publish** — serial streamed upload to Photos (`/v1/uploads`); local hydrate + remux companions are released after each item. Per-item checkpoints live on the upload job’s `extra` so a crash can resume without re-uploading completed items.
+4. **Size class** — `large` when any media file is **> 256 MiB** or total media **> 1 GiB** (else `small`). Folder import uses browser `File.size`; scrape probes `Content-Length` via HEAD when available, otherwise measures on download. A single file above the hard ceiling (**1.5 GiB** on 2 GiB Cloud Run) is rejected/warned until streaming+disk policy is proven for that size.
+
+Do **not** use Google Photos as a draft/staging library.
+
 ## Env summary
 
 | Env | Meaning |

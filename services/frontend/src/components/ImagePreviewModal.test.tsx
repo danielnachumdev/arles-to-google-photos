@@ -181,7 +181,7 @@ describe('ImagePreviewModal', () => {
     expect(screen.getByRole('status')).toHaveTextContent(t.videoPreviewLoadFailed)
   })
 
-  it('explains missing browser copy without mounting a broken player', () => {
+  it('shows a poster-only video preview without hydrating a player', () => {
     render(
       <ImagePreviewModal
         target={{
@@ -197,10 +197,27 @@ describe('ImagePreviewModal', () => {
       />,
     )
     expect(document.querySelector('video')).toBeNull()
-    expect(screen.getByRole('status')).toHaveTextContent(t.videoPreviewNoBrowserCopy)
+    expect(screen.queryByRole('status')).toBeNull()
     expect(document.querySelector('.image-preview-modal__video-poster')).toHaveAttribute(
       'src',
       '/api/jobs/job-1/media/clip01?variant=thumb',
     )
+  })
+
+  it('explains missing browser copy without mounting a broken player', () => {
+    render(
+      <ImagePreviewModal
+        target={{
+          id: 'clip01',
+          index: 1,
+          src: '',
+          kind: 'video',
+          relpath: 'hrimages/clip01hr.wmv',
+        }}
+        onClose={() => undefined}
+      />,
+    )
+    expect(document.querySelector('video')).toBeNull()
+    expect(screen.getByRole('status')).toHaveTextContent(t.videoPreviewNoBrowserCopy)
   })
 })

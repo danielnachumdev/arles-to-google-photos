@@ -77,6 +77,39 @@ def _form_optional_str(form: FormData, key: str) -> Optional[str]:
     return str(raw)
 
 
+def _size_meta_from_form(form: FormData) -> Dict[str, Any]:
+    from ...export.publish_checkpoint import (
+        HARD_FILE_CEILING_BYTES,
+        SIZE_CLASS_KEY,
+        classify_media_sizes,
+        exceeds_hard_file_ceiling,
+    )
+
+    def _int(name: str) -> int:
+        raw = _form_optional_str(form, name)
+        if not raw:
+            return 0
+        try:
+            return max(int(raw), 0)
+        except ValueError:
+            return 0
+
+    total_bytes = _int("total_bytes")
+    max_bytes = _int("max_bytes")
+    size_class = (_form_optional_str(form, "size_class") or "").strip().lower()
+    if size_class not in {"small", "large"}:
+        size_class = classify_media_sizes(
+            total_bytes=total_bytes, max_bytes=max_bytes
+        )
+    return {
+        SIZE_CLASS_KEY: size_class,
+        "total_bytes": total_bytes,
+        "max_bytes": max_bytes,
+        "exceeds_hard_ceiling": exceeds_hard_file_ceiling(max_bytes)
+        or max_bytes > HARD_FILE_CEILING_BYTES,
+    }
+
+
 def _wants_ndjson_progress(request: Request) -> bool:
     accept = (request.headers.get("accept") or "").lower()
     return NDJSON_ACCEPT in accept
@@ -142,6 +175,15 @@ async def create_job(
     """
     parts = _album_parts_from_form(form)
     access_token = _form_optional_str(form, "access_token")
+    size_meta = _size_meta_from_form(form)
+    if size_meta.get("exceeds_hard_ceiling"):
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                "album contains a file larger than the publish ceiling "
+                f"({size_meta.get('max_bytes')} bytes)"
+            ),
+        )
     if auto_publish and not (access_token or "").strip():
         raise HTTPException(
             status_code=400, detail="google access token required"
@@ -161,6 +203,7 @@ async def create_job(
                 auto_publish=auto_publish,
                 access_token=access_token,
                 owner_id=user.id,
+                size_meta=size_meta,
             )
         except AlbumExistsError as exc:
             raise _album_exists_http(exc) from exc
@@ -174,6 +217,7 @@ async def create_job(
         auto_publish=auto_publish,
         access_token=access_token,
         owner_id=user.id,
+        size_meta=size_meta,
     )
     try:
         first = next(events)

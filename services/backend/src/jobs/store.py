@@ -902,12 +902,50 @@ class JobStore:
             self._require(job_id).root = root
         return root
 
+    def materialize_album_tree(self, job_id: str, album_root: Path) -> Path:
+        """Stream each file under ``album_root`` into the job artifact store.
+
+        Avoids holding the full album as Python ``bytes`` (LARGE scrapes).
+        When the store already retains a full local tree and ``album_root`` is
+        that job's root, files are left in place.
+        """
+        album = Path(album_root)
+        if not album.is_dir():
+            raise ValueError(f"album_root is not a directory: {album}")
+        job = self.get(job_id)
+        artifacts = self._require_artifacts()
+        artifact_id = job.source_job_id or job.id
+        artifacts.ensure_job(artifact_id, owner_id=job.owner_id)
+        dest_root = artifacts.local_root(
+            artifact_id, owner_id=job.owner_id, hydrate=False
+        )
+        same_tree = album.resolve() == Path(dest_root).resolve()
+        if same_tree and artifacts.retains_full_local_tree:
+            with self._lock:
+                self._require(job_id).root = dest_root
+            return dest_root
+        skip = {
+            JOB_META_NAME,
+            EVENTS_NAME,
+            f"{JOB_META_NAME}.tmp",
+            f"{EVENTS_NAME}.tmp",
+        }
+        for path in sorted(album.rglob("*")):
+            if not path.is_file() or path.name in skip:
+                continue
+            rel = path.relative_to(album).as_posix()
+            # FS same-tree already returned; GCS same-tree uploads then sparsifies.
+            self.put_album_file(job_id, rel, path, path.stat().st_mtime)
+        with self._lock:
+            self._require(job_id).root = dest_root
+        return dest_root
+
     def copy_artifacts(self, source_id: str, dest_id: str) -> None:
         """Copy album files from ``source_id`` to ``dest_id``.
 
         Does not copy ``job.json`` / ``events.json`` and does not mutate the
-        source tree. Writes through ``ArtifactStore.materialize`` so GCS (and
-        other remote backends) persist the destination, not only the local cache.
+        source tree. Streams each file via ``put_file`` so large albums are not
+        held entirely in RAM.
         """
         with self._lock:
             source = self._require(source_id)
@@ -923,20 +961,36 @@ class JobStore:
         }
         if not src_root.is_dir():
             return
-        files = []
-        for path in src_root.rglob("*"):
+        for path in sorted(src_root.rglob("*")):
             if not path.is_file() or path.name in skip:
                 continue
+            # Skip empty media placeholders when source is a sparse GCS cache;
+            # ensure real bytes first when the classifier marks media.
             rel = path.relative_to(src_root).as_posix()
-            files.append((rel, path.read_bytes(), path.stat().st_mtime))
-        if files:
-            artifacts.materialize(dest_id, files, owner_id=dest.owner_id)
+            try:
+                ensured = artifacts.ensure_file(
+                    source_id, rel, owner_id=source.owner_id
+                )
+            except Exception:
+                ensured = path
+            if not ensured.is_file() or ensured.stat().st_size <= 0:
+                if path.stat().st_size <= 0:
+                    continue
+                ensured = path
+            artifacts.put_file(
+                dest_id,
+                rel,
+                ensured,
+                ensured.stat().st_mtime,
+                owner_id=dest.owner_id,
+            )
 
     def create_upload_from(
         self,
         source_id: str,
         *,
         parent_job_id: Optional[str] = None,
+        extra: Optional[Dict[str, Any]] = None,
     ) -> Job:
         with self._lock:
             source = self._require(source_id)
@@ -953,6 +1007,32 @@ class JobStore:
                 parent_job_id=source.parent_job_id,
                 scrape_url=source.scrape_url,
             )
+            # Hub leaf previews store files under extra.album_relpath on the
+            # shared parent tree; upload must keep that prefix to resolve media.
+            # Do not inherit prior publish checkpoints unless the caller passes
+            # them (remaining-mode resume).
+            from ..export.publish_checkpoint import (
+                PHOTOS_ALBUM_ID_KEY,
+                PHOTOS_ALBUM_TITLE_KEY,
+                PHOTOS_ALBUM_URL_KEY,
+                PUBLISH_ITEMS_KEY,
+                SIZE_CLASS_KEY,
+                merge_extra,
+            )
+
+            merged_extra = dict(parse_extra(source.extra) or {})
+            for key in (
+                PUBLISH_ITEMS_KEY,
+                PHOTOS_ALBUM_ID_KEY,
+                PHOTOS_ALBUM_URL_KEY,
+                PHOTOS_ALBUM_TITLE_KEY,
+            ):
+                merged_extra.pop(key, None)
+            if SIZE_CLASS_KEY not in merged_extra and source.extra:
+                # keep size_class from preview/source when present
+                pass
+            if extra:
+                merged_extra = merge_extra(merged_extra, extra)
             record = JobRecord(
                 id=job_id,
                 status=STATUS_PENDING,
@@ -964,9 +1044,7 @@ class JobStore:
                 number=self._require_state().allocate_number(),
                 import_origin=origin,
                 owner_id=source.owner_id,
-                # Hub leaf previews store files under extra.album_relpath on the
-                # shared parent tree; upload must keep that prefix to resolve media.
-                extra=parse_extra(source.extra),
+                extra=merged_extra or None,
             )
         self._require_state().create(record)
         job = self._to_job(record, events=[])

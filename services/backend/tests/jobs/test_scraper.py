@@ -213,5 +213,11 @@ class TestJobsScraperAdapter(TmpPathSuite):
             sink=RecordingSink(),
             output_dir=tmp_path / "out2",
         )
-        assert result2.files[0][1] == b"<html>nosink</html>"
+        assert result2.album_root is not None
+        assert result2.files[0][0] == "index.html"
+        # Album-root results keep path stubs only; bytes live on disk for tree materialize.
+        assert result2.files[0][1] == b""
+        assert (Path(result2.album_root) / "index.html").read_bytes() == (
+            b"<html>nosink</html>"
+        )
 

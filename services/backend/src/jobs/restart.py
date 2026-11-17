@@ -55,6 +55,7 @@ class _PublishLike(Protocol):
         *,
         access_token: str,
         parent_job_id: Optional[str] = None,
+        extra: Optional[Dict[str, Any]] = None,
     ) -> str:
         ...
 
@@ -143,7 +144,7 @@ class RestartService:
         if source.type == TYPE_PREVIEW:
             return self._restart_preview(source, token)
         if source.type == TYPE_UPLOAD:
-            return self._restart_upload(source, token)
+            return self._restart_upload(source, token, mode=resolved_mode)
         if source.type == TYPE_VALIDATE:
             return self._restart_validate(source, token)
         raise ValueError(f"unsupported job type: {source.type}")
@@ -220,13 +221,36 @@ class RestartService:
         self._submit(new_id, run)
         return new_id
 
-    def _restart_upload(self, source: Job, token: Optional[str]) -> str:
+    def _restart_upload(
+        self,
+        source: Job,
+        token: Optional[str],
+        *,
+        mode: str = RESTART_MODE_ALL,
+    ) -> str:
         if not token:
             raise ValueError("google access token required")
+        # Prefer the failed/cancelled upload itself so remaining-mode can reuse
+        # its per-item Photos checkpoints; fall back to the preview source tree.
         source_id = source.id
         if source.preview is None and source.source_job_id:
             source_id = source.source_job_id
-        new_id = self._publish.start(source_id, access_token=token)
+        extra: Optional[Dict[str, Any]] = None
+        if mode == RESTART_MODE_REMAINING and source.type == TYPE_UPLOAD:
+            from ..export.publish_checkpoint import (
+                copy_created_checkpoints,
+                created_item_ids,
+            )
+
+            carried = copy_created_checkpoints(source.extra)
+            created = created_item_ids(carried)
+            if source.preview is not None and created:
+                if len(created) >= len(source.preview.items):
+                    raise ValueError("no remaining publish items to run")
+            extra = carried or None
+        new_id = self._publish.start(
+            source_id, access_token=token, extra=extra
+        )
 
         def run() -> None:
             self._publish.finish(new_id, access_token=token)

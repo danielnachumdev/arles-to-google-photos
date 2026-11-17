@@ -71,17 +71,19 @@ def _publish_with_album(tmp_path: Path, preview: AlbumPreview):
 
     img = tmp_path / "hrimages" / "a.jpg"
     img.parent.mkdir(exist_ok=True)
-    if not img.exists():
+    if not img.exists() or img.stat().st_size <= 0:
         img.write_bytes(b"x")
     gp = MagicMock()
     album = MagicMock()
     album.id = "album-journal"
     album.productUrl = "https://photos.example/journal"
     with patch("src.export.publisher.Album") as AlbumCls, patch(
+        "src.export.publisher.stream_upload_media"
+    ) as UPLOAD, patch(
         "src.export.publisher.MediaItem"
     ) as MediaItemCls:
         AlbumCls.create.return_value = album
-        MediaItemCls.upload_media.return_value = "tok"
+        UPLOAD.return_value = "tok"
         MediaItemCls.batchCreate.return_value = []
         AlbumPublisher().publish(gp, tmp_path, preview)
     return album, MediaItemCls
@@ -108,10 +110,12 @@ class TestAlbumPublisher(PublisherSuite):
         sink = MagicMock()
 
         with patch("src.export.publisher.Album") as AlbumCls, patch(
+            "src.export.publisher.stream_upload_media"
+        ) as UPLOAD, patch(
             "src.export.publisher.MediaItem"
         ) as MediaItemCls:
             AlbumCls.create.return_value = album
-            MediaItemCls.upload_media.return_value = "tok-1"
+            UPLOAD.return_value = "tok-1"
             MediaItemCls.batchCreate.return_value = []
 
             result = AlbumPublisher().publish(gp, tmp_path, preview, sink=sink)
@@ -119,7 +123,8 @@ class TestAlbumPublisher(PublisherSuite):
         assert result is album
         AlbumCls.create.assert_called_once_with(gp, "Mini")
         album.add_text.assert_called_once_with(["Desc"])
-        MediaItemCls.upload_media.assert_called_once_with(gp, str(img))
+        assert UPLOAD.call_args.args[0] is gp
+        assert Path(UPLOAD.call_args.args[1]) == img
         MediaItemCls.batchCreate.assert_called_once()
         attached = MediaItemCls.batchCreate.call_args.args
         assert attached[0] is gp
@@ -145,10 +150,12 @@ class TestAlbumPublisher(PublisherSuite):
         album.productUrl = "https://photos.example/a3"
 
         with patch("src.export.publisher.Album") as AlbumCls, patch(
+            "src.export.publisher.stream_upload_media"
+        ) as UPLOAD, patch(
             "src.export.publisher.MediaItem"
         ) as MediaItemCls:
             AlbumCls.create.return_value = album
-            MediaItemCls.upload_media.return_value = "t"
+            UPLOAD.return_value = "t"
             MediaItemCls.batchCreate.return_value = []
             AlbumPublisher().publish(gp, tmp_path, preview)
 
@@ -191,10 +198,12 @@ class TestAlbumPublisher(PublisherSuite):
         )
 
         with patch("src.export.publisher.Album") as AlbumCls, patch(
+            "src.export.publisher.stream_upload_media"
+        ) as UPLOAD, patch(
             "src.export.publisher.MediaItem"
         ) as MediaItemCls:
             AlbumCls.create.return_value = album
-            MediaItemCls.upload_media.side_effect = lambda *_a, **_k: (
+            UPLOAD.side_effect = lambda *_a, **_k: (
                 order.append("upload") or "tok"
             )
             MediaItemCls.batchCreate.return_value = []
@@ -231,9 +240,11 @@ class TestAlbumPublisher(PublisherSuite):
 
         with patch("src.export.publisher.MEDIA_ITEM_BATCH_CREATE_MAXIMUM_IDS", 2), patch(
             "src.export.publisher.Album"
-        ) as AlbumCls, patch("src.export.publisher.MediaItem") as MediaItemCls:
+        ) as AlbumCls, patch(
+            "src.export.publisher.stream_upload_media"
+        ) as UPLOAD, patch("src.export.publisher.MediaItem") as MediaItemCls:
             AlbumCls.create.return_value = album
-            MediaItemCls.upload_media.side_effect = lambda *_a, **_k: (
+            UPLOAD.side_effect = lambda *_a, **_k: (
                 order.append("upload") or f"t{len(order)}"
             )
             MediaItemCls.batchCreate.side_effect = lambda *_a, **_k: (
@@ -284,9 +295,11 @@ class TestAlbumPublisher(PublisherSuite):
 
         with patch("src.export.publisher.MEDIA_ITEM_BATCH_CREATE_MAXIMUM_IDS", 2), patch(
             "src.export.publisher.Album"
-        ) as AlbumCls, patch("src.export.publisher.MediaItem") as MediaItemCls:
+        ) as AlbumCls, patch(
+            "src.export.publisher.stream_upload_media"
+        ) as UPLOAD, patch("src.export.publisher.MediaItem") as MediaItemCls:
             AlbumCls.create.return_value = album
-            MediaItemCls.upload_media.side_effect = upload
+            UPLOAD.side_effect = upload
             MediaItemCls.batchCreate.return_value = [
                 MagicMock(mediaItem=MagicMock(id="mid-1")),
                 MagicMock(mediaItem=MagicMock(id="mid-2")),
@@ -516,10 +529,12 @@ class TestAlbumPublisher(PublisherSuite):
         album = MagicMock()
         album.id = "album-x"
         with patch("src.export.publisher.Album") as AlbumCls, patch(
+            "src.export.publisher.stream_upload_media"
+        ) as UPLOAD, patch(
             "src.export.publisher.MediaItem"
         ) as MediaItem:
             AlbumCls.create.return_value = album
-            MediaItem.upload_media.side_effect = RuntimeError(
+            UPLOAD.side_effect = RuntimeError(
                 "400 Client Error: Bad Request for url: "
                 "https://photoslibrary.googleapis.com/v1/uploads"
             )
@@ -529,7 +544,7 @@ class TestAlbumPublisher(PublisherSuite):
         assert "0308_1_22" in message
         assert "0308_1_22hr.wmv" in message
         assert "uploaded 0308_1_22hr.mp4" in message
-        uploaded_path = Path(MediaItem.upload_media.call_args.args[1])
+        uploaded_path = Path(UPLOAD.call_args.args[1])
         assert uploaded_path.suffix.lower() == ".mp4"
         assert uploaded_path.stat().st_size > 0
 
@@ -567,15 +582,17 @@ class TestAlbumPublisher(PublisherSuite):
         album = MagicMock()
         album.id = "album-wmv"
         with patch("src.export.publisher.Album") as AlbumCls, patch(
+            "src.export.publisher.stream_upload_media"
+        ) as UPLOAD, patch(
             "src.export.publisher.MediaItem"
         ) as MediaItem:
             AlbumCls.create.return_value = album
-            MediaItem.upload_media.return_value = "tok-mp4"
+            UPLOAD.return_value = "tok-mp4"
             MediaItem.batchCreate.return_value = []
             AlbumPublisher(media=PublishMediaPreparer()).publish(
                 gp, tmp_path, preview, resolve=resolve
             )
-        uploaded = Path(MediaItem.upload_media.call_args.args[1])
+        uploaded = Path(UPLOAD.call_args.args[1])
         assert uploaded.name == "clip01hr.mp4"
         assert uploaded.read_bytes() == durable
 
@@ -592,10 +609,12 @@ class TestAlbumPublisher(PublisherSuite):
         album = MagicMock()
         album.id = "album-batch"
         with patch("src.export.publisher.Album") as AlbumCls, patch(
+            "src.export.publisher.stream_upload_media"
+        ) as UPLOAD, patch(
             "src.export.publisher.MediaItem"
         ) as MediaItem:
             AlbumCls.create.return_value = album
-            MediaItem.upload_media.return_value = "tok"
+            UPLOAD.return_value = "tok"
             MediaItem.batchCreate.side_effect = RuntimeError("quota exceeded")
             with pytest.raises(RuntimeError, match="batchCreate") as caught:
                 AlbumPublisher().publish(gp, tmp_path, preview)

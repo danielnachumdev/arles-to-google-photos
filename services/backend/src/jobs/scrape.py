@@ -5,6 +5,11 @@ from pathlib import Path
 from typing import Any, Callable, Dict, Mapping, Optional, Protocol, Set
 from urllib.parse import urlparse
 
+from ..export.publish_checkpoint import (
+    SIZE_CLASS_KEY,
+    classify_media_sizes,
+    merge_extra,
+)
 from ..export.scrape.scraper import (
     NotArlesGalleryError,
     ScrapeEmptyError,
@@ -19,7 +24,6 @@ from .scraper import (
     should_spawn_preview_child,
     validate_scrape_url,
 )
-
 ERROR_NOT_ARLES = "not_arles"
 ERROR_FETCH_FAILED = "fetch_failed"
 ERROR_SCRAPE_EMPTY = "scrape_empty"
@@ -36,6 +40,7 @@ from .store import (
     TYPE_SCRAPE,
     Job,
     JobStore,
+    parse_extra,
     scrape_child_progress,
 )
 
@@ -197,10 +202,39 @@ class ScrapeService:
                     f"parent/hub that lists child indexes.",
                     url=scrape_url,
                 )
-            if files:
+            size_class = result.size_class
+            if size_class is None and (result.total_bytes or result.max_bytes):
+                size_class = classify_media_sizes(
+                    total_bytes=int(result.total_bytes or 0),
+                    max_bytes=int(result.max_bytes or 0),
+                )
+            if size_class:
+                current = self._store.get(job_id)
+                self._store.update_extra(
+                    job_id,
+                    merge_extra(
+                        parse_extra(current.extra),
+                        {
+                            SIZE_CLASS_KEY: size_class,
+                            "total_bytes": int(result.total_bytes or 0),
+                            "max_bytes": int(result.max_bytes or 0),
+                        },
+                    ),
+                )
+            if result.album_root is not None and files:
+                self._store.materialize_album_tree(job_id, Path(result.album_root))
+            elif files:
+                # Legacy in-memory file tuples (tests / adapters).
                 self._store.materialize_album(job_id, files)
             if should_spawn_preview_child(files, result.gallery_urls):
-                preview_id = self._ensure_preview_child(job, files)
+                preview_id = self._ensure_preview_child(
+                    job,
+                    files,
+                    album_root=result.album_root,
+                    size_class=size_class,
+                    total_bytes=int(result.total_bytes or 0),
+                    max_bytes=int(result.max_bytes or 0),
+                )
                 preview_job = self._store.get(preview_id)
                 title = ""
                 item_count = 0
@@ -405,6 +439,11 @@ class ScrapeService:
         self,
         parent: Job,
         files: Any,
+        *,
+        album_root: Optional[Path] = None,
+        size_class: Optional[str] = None,
+        total_bytes: int = 0,
+        max_bytes: int = 0,
     ) -> str:
         existing = [
             child
@@ -427,7 +466,23 @@ class ScrapeService:
             self._store.cancel_if_running(child.id)
             raise JobCancelled()
         self._store.set_status(child.id, STATUS_RUNNING, job_type=TYPE_PREVIEW)
-        self._store.materialize_album(child.id, files)
+        if size_class:
+            current = self._store.get(child.id)
+            self._store.update_extra(
+                child.id,
+                merge_extra(
+                    parse_extra(current.extra),
+                    {
+                        SIZE_CLASS_KEY: size_class,
+                        "total_bytes": int(total_bytes or 0),
+                        "max_bytes": int(max_bytes or 0),
+                    },
+                ),
+            )
+        if album_root is not None:
+            self._store.materialize_album_tree(child.id, Path(album_root))
+        else:
+            self._store.materialize_album(child.id, files)
         preview = self._parser.parse(
             child.root,
             sink=cancellable_sink(

@@ -2,7 +2,7 @@
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Callable, List, Optional, Protocol, Sequence
+from typing import Any, Callable, Dict, List, Optional, Protocol, Sequence
 
 from gpsdk import (
     MEDIA_ITEM_BATCH_CREATE_MAXIMUM_IDS,
@@ -17,12 +17,19 @@ from gpsdk import (
 
 from ..progress import ProgressSink, raise_if_cancelled
 from ..utils import batchify
+from .photos_upload import release_upload_paths, stream_upload_media
 from .preview import AlbumJournal, AlbumPreview, PreviewItem
 from .publish_media import PublishMediaPreparer
 from .timestamps import CaptureTimestampStamper
 
 PathResolver = Callable[[str], Path]
 PathReleaser = Callable[[str], None]
+# item_id, status (uploaded|created|failed), fields
+ItemCheckpoint = Callable[[str, str, Dict[str, Any]], None]
+
+STATUS_CREATED = "created"
+STATUS_UPLOADED = "uploaded"
+STATUS_FAILED = "failed"
 
 
 class _StamperLike(Protocol):
@@ -49,16 +56,20 @@ class _StamperLike(Protocol):
 
 
 class AlbumPublisher:
-    """Create a Photos album and attach preview media via gpsdk."""
+    """Create a Photos album and attach preview media (streamed uploads)."""
 
     def __init__(
         self,
         stamper: Optional[_StamperLike] = None,
         *,
         media: Optional[PublishMediaPreparer] = None,
+        upload_media: Optional[Callable[[Any, Path], str]] = None,
     ) -> None:
         self._stamper = stamper or CaptureTimestampStamper()
         self._media = media or PublishMediaPreparer()
+        self._upload_media = upload_media or (
+            lambda gp, path: stream_upload_media(gp, path)
+        )
 
     def publish(
         self,
@@ -69,49 +80,66 @@ class AlbumPublisher:
         *,
         resolve: Optional[PathResolver] = None,
         release: Optional[PathReleaser] = None,
+        skip_item_ids: Optional[Sequence[str]] = None,
+        resume_album: Optional[Album] = None,
+        on_item_checkpoint: Optional[ItemCheckpoint] = None,
+        on_album: Optional[Callable[[Album], None]] = None,
     ) -> Album:
         root = Path(root)
         resolve_path = resolve or (lambda rel: root / rel)
-        to_upload = list(preview.items)
-        total = len(to_upload)
+        skip = {str(x) for x in (skip_item_ids or ()) if str(x).strip()}
+        to_upload = [item for item in preview.items if item.id not in skip]
+        total = len(preview.items)
+        already_done = total - len(to_upload)
         if sink is not None:
-            sink.emit("publish", "Creating album", current=0, total=max(total, 1))
+            sink.emit(
+                "publish",
+                "Creating album" if resume_album is None else "Resuming album",
+                current=already_done,
+                total=max(total, 1),
+            )
 
-        album = _create_album(gp, preview.title)
-        if preview.description:
-            _photos_step(
-                "add_text (gallery description)",
-                lambda: album.add_text([preview.description]),
-            )
-        # FIRST_IN_ALBUM inserts at the start, so later calls sit higher:
-        # heading (top) → body → gallery description → photos.
-        body_parts = _journal_body_parts(preview.journal)
-        if body_parts is not None:
-            _photos_step(
-                "add_text (journal body)",
-                lambda: album.add_text(
-                    body_parts,
-                    relative_position=PositionType.FIRST_IN_ALBUM,
-                ),
-            )
-        heading_parts = _journal_heading_parts(preview.journal)
-        if heading_parts is not None:
-            _photos_step(
-                "add_text (journal heading)",
-                lambda: album.add_text(
-                    heading_parts,
-                    relative_position=PositionType.FIRST_IN_ALBUM,
-                ),
-            )
+        if resume_album is not None:
+            album = resume_album
+        else:
+            album = _create_album(gp, preview.title)
+            if on_album is not None:
+                on_album(album)
+            if preview.description:
+                _photos_step(
+                    "add_text (gallery description)",
+                    lambda: album.add_text([preview.description]),
+                )
+            # FIRST_IN_ALBUM inserts at the start, so later calls sit higher:
+            # heading (top) → body → gallery description → photos.
+            body_parts = _journal_body_parts(preview.journal)
+            if body_parts is not None:
+                _photos_step(
+                    "add_text (journal body)",
+                    lambda: album.add_text(
+                        body_parts,
+                        relative_position=PositionType.FIRST_IN_ALBUM,
+                    ),
+                )
+            heading_parts = _journal_heading_parts(preview.journal)
+            if heading_parts is not None:
+                _photos_step(
+                    "add_text (journal heading)",
+                    lambda: album.add_text(
+                        heading_parts,
+                        relative_position=PositionType.FIRST_IN_ALBUM,
+                    ),
+                )
 
         # Prefer taken_on from preview ids; do not resolve media just to sniff EXIF.
-        album_day = self._stamper.album_day_for(root, to_upload)
+        album_day = self._stamper.album_day_for(root, preview.items)
         prev = None
         last_id: Optional[str] = None
-        done = 0
+        done = already_done
         for batch_items in batchify(to_upload, MEDIA_ITEM_BATCH_CREATE_MAXIMUM_IDS):
             raise_if_cancelled(sink)
             new_items: List[NewMediaItem] = []
+            prepared: List[tuple[PreviewItem, Path]] = []
             for item in batch_items:
                 raise_if_cancelled(sink)
                 absolute_index = done
@@ -136,17 +164,25 @@ class AlbumPublisher:
                 )
                 done += 1
                 try:
-                    token = MediaItem.upload_media(gp, str(path))
+                    token = self._upload_media(gp, path)
                 except Exception as exc:
+                    if on_item_checkpoint is not None:
+                        on_item_checkpoint(
+                            item.id,
+                            STATUS_FAILED,
+                            {"error": str(exc), "relpath": item.relpath},
+                        )
                     raise RuntimeError(_format_upload_reject(item, path, exc)) from exc
+                if on_item_checkpoint is not None:
+                    on_item_checkpoint(
+                        item.id,
+                        STATUS_UPLOADED,
+                        {"relpath": item.relpath, "upload_name": path.name},
+                    )
                 new_items.append(
                     NewMediaItem(item.caption, SimpleMediaItem(token, item.id))
                 )
-                if release is not None:
-                    release(item.relpath)
-                    play = (item.play_relpath or "").strip()
-                    if play:
-                        release(play)
+                prepared.append((item, path))
                 if sink is not None:
                     sink.emit("publish", item.relpath, current=done, total=total)
             if last_id is None:
@@ -160,7 +196,22 @@ class AlbumPublisher:
                 _batch_create_label(new_items),
                 lambda: MediaItem.batchCreate(gp, new_items, album.id, position),
             )
-            last_id = _last_created_media_id(results) or last_id
+            created_ids = _created_media_ids(results)
+            for index, (item, path) in enumerate(prepared):
+                media_id = created_ids[index] if index < len(created_ids) else None
+                if on_item_checkpoint is not None:
+                    payload: Dict[str, Any] = {"relpath": item.relpath}
+                    if media_id:
+                        payload["media_item_id"] = media_id
+                    on_item_checkpoint(item.id, STATUS_CREATED, payload)
+                release_upload_paths(
+                    album_root=root,
+                    item_relpath=item.relpath,
+                    play_relpath=item.play_relpath,
+                    upload_path=path,
+                    release=release,
+                )
+            last_id = (created_ids[-1] if created_ids else None) or last_id
         return album
 
 
@@ -229,7 +280,6 @@ def _batch_create_label(new_items: Sequence[NewMediaItem]) -> str:
     return f"batchCreate ('{ids[0]}'…'{ids[-1]}', {len(ids)} items)"
 
 
-
 def _create_album(gp: GooglePhotos, title: str) -> Album:
     """Create a Photos album; surface API failures that gpsdk masks as KeyError('id')."""
     try:
@@ -244,11 +294,28 @@ def _create_album(gp: GooglePhotos, title: str) -> Album:
         raise
 
 
+def album_from_checkpoint(
+    gp: GooglePhotos,
+    *,
+    album_id: str,
+    title: str,
+    product_url: str = "",
+) -> Album:
+    """Rebuild an Album handle from durable publish checkpoints."""
+    return Album(
+        gp,
+        id=album_id,
+        title=title,
+        productUrl=product_url or "",
+        isWriteable=True,
+    )
+
+
 def _chunk_text(text: str, limit: int = _ADD_TEXT_PART_LIMIT) -> List[str]:
     """Split text so each gpsdk add_text part stays within Google's limit."""
     if not text:
         return []
-    return [text[i:i + limit] for i in range(0, len(text), limit)]
+    return [text[i : i + limit] for i in range(0, len(text), limit)]
 
 
 def _journal_heading_parts(journal: Optional[AlbumJournal]) -> Optional[List[str]]:
@@ -276,10 +343,17 @@ def _journal_body_parts(journal: Optional[AlbumJournal]) -> Optional[List[str]]:
     return parts
 
 
-def _last_created_media_id(results: Sequence[object]) -> Optional[str]:
-    for result in reversed(list(results)):
+def _created_media_ids(results: Sequence[object]) -> List[str]:
+    ids: List[str] = []
+    for result in results:
         media = getattr(result, "mediaItem", None)
         item_id = getattr(media, "id", None) if media is not None else None
+        ids.append(str(item_id) if item_id else "")
+    return ids
+
+
+def _last_created_media_id(results: Sequence[object]) -> Optional[str]:
+    for item_id in reversed(_created_media_ids(results)):
         if item_id:
-            return str(item_id)
+            return item_id
     return None

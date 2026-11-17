@@ -299,6 +299,8 @@ export type MessageCatalog = {
   videoPreviewAria: (id: string) => string
   videoBadge: string
   videoPreviewNoBrowserCopy: string
+  largeAlbumNotice: string
+  albumFileTooLarge: (maxLabel: string) => string
   videoPreviewLoadFailed: string
   videoPreviewUnavailable: string
 
