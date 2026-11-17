@@ -105,7 +105,7 @@ class TestPublishService(MockJobServiceSuite):
         )
 
         assert upload_id == "upload-1"
-        store.create_upload_from.assert_called_once_with("job-1")
+        store.create_upload_from.assert_called_once_with("job-1", extra=None)
         store.set_status.assert_any_call("upload-1", "running", job_type="upload")
         store.mark_done.assert_called_once_with("upload-1", "https://photos.example/album-1")
         assert all(call.args[0] != "job-1" for call in store.set_status.call_args_list)
@@ -200,7 +200,7 @@ class TestPublishService(MockJobServiceSuite):
         )
 
         assert upload_id == "upload-new"
-        store.create_upload_from.assert_called_once_with("upload-old")
+        store.create_upload_from.assert_called_once_with("upload-old", extra=None)
         store.set_status.assert_any_call("upload-new", "running", job_type="upload")
         store.mark_done.assert_called_once_with("upload-new", "https://photos.example/album-2")
         publisher.publish.assert_called_once()
@@ -279,7 +279,9 @@ class TestPublishService(MockJobServiceSuite):
         )
 
         assert upload_id == "upload-1"
-        store.create_upload_from.assert_called_once_with("job-1", parent_job_id="job-1")
+        store.create_upload_from.assert_called_once_with(
+            "job-1", parent_job_id="job-1", extra=None
+        )
         child_calls = [c for c in events.emit.call_args_list if c.args[1] == "child"]
         assert child_calls
         assert child_calls[0].args[0] == "job-1"
@@ -301,7 +303,7 @@ class TestPublishService(MockJobServiceSuite):
         )
 
         assert upload_id == "upload-1"
-        store.create_upload_from.assert_called_once_with("job-1")
+        store.create_upload_from.assert_called_once_with("job-1", extra=None)
         running_calls = [
             call
             for call in store.set_status.call_args_list
