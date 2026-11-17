@@ -27,7 +27,7 @@ from ..jobs.tokens import AccessTokenVault
 from ..jobs.validate import ValidateService
 from ..jobs.workspace import JobWorkspace
 from .deps import ApiDependencies
-from ..version import __version__
+from ..version import resolved_version
 from .routers import (
     auth_router,
     events_router,
@@ -143,7 +143,7 @@ def create_app(
         validate=validate,
     )
 
-    app = FastAPI(title="Arles Migrator", version=__version__)
+    app = FastAPI(title="Arles Migrator", version=resolved_version())
     app.add_middleware(
         CORSMiddleware,
         allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],

@@ -1,13 +1,15 @@
 name: CI
 
 # Thin orchestrator for monorepo (backend Python + frontend Node).
-# Prefer requiring check "CI" (aggregate). Non-publisher app — no Semver.
+# Prefer requiring check "CI" (aggregate) and "Semver / Semver" on PRs.
+# Semver: exactly one of noBump | bumpPatch | bumpMinor | bumpMajor.
 
 on:
   push:
     branches: [main]
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
   workflow_dispatch:
 
 concurrency:
@@ -37,6 +39,13 @@ jobs:
       # Prior CI was Node 22 only; default matrix includes 20 where vitest asserts flake.
       node-versions: '["22"]'
 
+  semver:
+    name: Semver
+    if: github.event_name == 'pull_request'
+    uses: danielnachumdev/actions/.github/workflows/semver-ci.yml@latest
+    with:
+      standards-ref: latest
+
   # Aggregate gate → single required check name "CI" (local job, not reusable).
   ci:
     name: CI
@@ -57,10 +66,11 @@ jobs:
 
   dependabot-auto-merge:
     name: Dependabot auto-merge
-    needs: [ci]
+    needs: [ci, semver]
     if: >
       always() &&
       needs.ci.result == 'success' &&
+      needs.semver.result == 'success' &&
       github.event_name == 'pull_request' &&
       github.event.pull_request.user.login == 'dependabot[bot]'
     permissions:

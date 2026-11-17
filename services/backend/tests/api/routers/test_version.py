@@ -5,15 +5,29 @@ from pathlib import Path
 
 from tests.support.api import MigratorApi
 
-from src.version import BUILD_TIME, __version__
+from src.version import BUILD_TIME, __version__, resolved_version
 
 
 def test_get_version(tmp_path: Path) -> None:
     client = MigratorApi(tmp_path).client
     response = client.get("/api/version")
     assert response.status_code == 200
-    assert response.json() == {"version": __version__, "build_time": BUILD_TIME or None}
+    assert response.json() == {
+        "version": resolved_version(),
+        "build_time": BUILD_TIME or None,
+    }
     assert __version__ == "1.0.0"
+    assert resolved_version() == "1.0.0"
+
+
+def test_get_version_prefers_baked_arles_version(
+    tmp_path: Path, monkeypatch: object
+) -> None:
+    monkeypatch.setenv("ARLES_VERSION", "9.8.7")
+    client = MigratorApi(tmp_path).client
+    response = client.get("/api/version")
+    assert response.status_code == 200
+    assert response.json()["version"] == "9.8.7"
 
 
 def test_get_version_includes_build_time_when_set(
@@ -28,4 +42,7 @@ def test_get_version_includes_build_time_when_set(
     client = MigratorApi(tmp_path).client
     response = client.get("/api/version")
     assert response.status_code == 200
-    assert response.json() == {"version": __version__, "build_time": stamp}
+    assert response.json() == {
+        "version": resolved_version(),
+        "build_time": stamp,
+    }

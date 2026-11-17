@@ -1,0 +1,33 @@
+name: Retag
+
+# Thin orchestrator for standalone floating-tag moves via workflow_dispatch.
+# For CD-time moves, pass `retags` on semver-cd instead.
+#   uses: danielnachumdev/actions/.github/workflows/retag.yml@latest
+
+on:
+  workflow_dispatch:
+    inputs:
+      sha:
+        description: Commit SHA that floating tags should point at
+        type: string
+        required: true
+      tags:
+        description: 'JSON array of tag names (e.g. ["latest"])'
+        type: string
+        default: '["latest"]'
+      dry_run:
+        description: Print planned moves without tagging or pushing
+        type: boolean
+        default: true
+
+permissions:
+  contents: write
+
+jobs:
+  retag:
+    name: Retag
+    uses: danielnachumdev/actions/.github/workflows/retag.yml@latest
+    with:
+      sha: ${{ inputs.sha }}
+      tags: ${{ inputs.tags }}
+      dry-run: ${{ inputs.dry_run }}
