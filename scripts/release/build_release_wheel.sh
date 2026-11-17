@@ -62,6 +62,24 @@ replace_once(
 print(f"stamped backend+frontend → {version}")
 PY
 
+ROOT_PYPROJECT="${ROOT}/pyproject.toml"
+if [[ -f "${ROOT_PYPROJECT}" ]]; then
+  python3 - "${ROOT_PYPROJECT}" "${VERSION}" <<'PY'
+import pathlib
+import re
+import sys
+
+path = pathlib.Path(sys.argv[1])
+version = sys.argv[2]
+text = path.read_text(encoding="utf-8")
+new, count = re.subn(r'^version = "[^"]+"', f'version = "{version}"', text, count=1, flags=re.M)
+if count != 1:
+    raise SystemExit(f"{path}: failed to update version ({count} matches)")
+path.write_text(new, encoding="utf-8")
+print(f"stamped root pyproject → {version}")
+PY
+fi
+
 cd "${BACKEND_DIR}"
 mkdir -p "${OUT_DIR}"
 # uv build names from pyproject name (hyphens → underscores in the wheel filename).

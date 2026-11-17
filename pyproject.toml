@@ -1,0 +1,8 @@
+# Version seed for semver-cd when no GitHub Release tags exist yet.
+# Publishable packages live under services/backend and services/frontend.
+[project]
+name = "arles-to-google-photos"
+version = "1.4.0"
+description = "Arles → Google Photos migrator (monorepo)"
+requires-python = ">=3.11"
+readme = "README.md"

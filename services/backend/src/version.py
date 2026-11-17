@@ -4,7 +4,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-__version__ = "1.0.0"
+__version__ = "1.4.0"
 
 # Written at image build (see Dockerfiles). Prefer env; fall back to stamp file.
 _BUILD_TIME_FILE = Path("/etc/arles-build-time")
