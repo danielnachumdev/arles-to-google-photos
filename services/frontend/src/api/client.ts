@@ -75,6 +75,9 @@ export class MigrationClient {
       overwrite?: boolean
       autoPublish?: boolean
       accessToken?: string
+      sizeClass?: 'small' | 'large'
+      totalBytes?: number
+      maxBytes?: number
       onUploadProgress?: (event: UploadProgressEvent) => void
       onStoreProgress?: (event: StoreProgressEvent) => void
     },
@@ -105,6 +108,15 @@ export class MigrationClient {
 
     if (options?.accessToken) {
       form.append('access_token', options.accessToken)
+    }
+    if (options?.sizeClass) {
+      form.append('size_class', options.sizeClass)
+    }
+    if (options?.totalBytes != null) {
+      form.append('total_bytes', String(options.totalBytes))
+    }
+    if (options?.maxBytes != null) {
+      form.append('max_bytes', String(options.maxBytes))
     }
 
     const params = new URLSearchParams()

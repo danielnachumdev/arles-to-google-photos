@@ -27,6 +27,10 @@ class ScrapeResult:
 
     files: Sequence[FileTuple] = field(default_factory=tuple)
     gallery_urls: Sequence[str] = field(default_factory=tuple)
+    album_root: Optional[Path] = None
+    size_class: Optional[str] = None
+    total_bytes: int = 0
+    max_bytes: int = 0
 
 
 class AlbumScraper(Protocol):
@@ -66,11 +70,47 @@ def validate_scrape_url(url: str) -> str:
     return stripped
 
 
+def _size_meta_from_raw(result: Any) -> Tuple[Optional[str], int, int]:
+    size_class = getattr(result, "size_class", None)
+    if isinstance(result, dict):
+        size_class = result.get("size_class", size_class)
+    total = getattr(result, "total_media_bytes", None)
+    if total is None:
+        total = getattr(result, "total_bytes", 0)
+    if isinstance(result, dict):
+        total = result.get("total_media_bytes", result.get("total_bytes", total))
+    max_b = getattr(result, "max_media_bytes", None)
+    if max_b is None:
+        max_b = getattr(result, "max_bytes", 0)
+    if isinstance(result, dict):
+        max_b = result.get("max_media_bytes", result.get("max_bytes", max_b))
+    try:
+        total_i = int(total or 0)
+    except (TypeError, ValueError):
+        total_i = 0
+    try:
+        max_i = int(max_b or 0)
+    except (TypeError, ValueError):
+        max_i = 0
+    class_s = str(size_class).strip().lower() if size_class else None
+    if class_s not in {"small", "large"}:
+        class_s = None
+    return class_s, total_i, max_i
+
+
 def normalize_scrape_result(result: Any) -> ScrapeResult:
+    size_class, total_bytes, max_bytes = _size_meta_from_raw(result)
     if isinstance(result, ScrapeResult):
         files = tuple(_normalize_file(item) for item in result.files)
         urls = tuple(str(item) for item in result.gallery_urls if str(item).strip())
-        return ScrapeResult(files=files, gallery_urls=urls)
+        return ScrapeResult(
+            files=files,
+            gallery_urls=urls,
+            album_root=result.album_root,
+            size_class=size_class or result.size_class,
+            total_bytes=total_bytes or result.total_bytes,
+            max_bytes=max_bytes or result.max_bytes,
+        )
     album_root = getattr(result, "album_root", None)
     if album_root is not None:
         urls_raw = (
@@ -78,9 +118,14 @@ def normalize_scrape_result(result: Any) -> ScrapeResult:
             or getattr(result, "gallery_urls", None)
             or ()
         )
+        root = Path(album_root)
         return ScrapeResult(
-            files=files_from_album_root(Path(album_root)),
+            files=files_from_album_root(root, load_bytes=False),
             gallery_urls=tuple(str(item) for item in urls_raw if str(item).strip()),
+            album_root=root,
+            size_class=size_class,
+            total_bytes=total_bytes,
+            max_bytes=max_bytes,
         )
     if isinstance(result, dict):
         if result.get("album_root"):
@@ -90,15 +135,23 @@ def normalize_scrape_result(result: Any) -> ScrapeResult:
                 or result.get("urls")
                 or ()
             )
+            root = Path(str(result["album_root"]))
             return ScrapeResult(
-                files=files_from_album_root(Path(str(result["album_root"]))),
+                files=files_from_album_root(root, load_bytes=False),
                 gallery_urls=tuple(str(item) for item in urls_raw if str(item).strip()),
+                album_root=root,
+                size_class=size_class,
+                total_bytes=total_bytes,
+                max_bytes=max_bytes,
             )
         files_raw = result.get("files") or ()
         urls_raw = result.get("gallery_urls") or result.get("urls") or ()
         return ScrapeResult(
             files=tuple(_normalize_file(item) for item in files_raw),
             gallery_urls=tuple(str(item) for item in urls_raw if str(item).strip()),
+            size_class=size_class,
+            total_bytes=total_bytes,
+            max_bytes=max_bytes,
         )
     files_attr = getattr(result, "files", None)
     if files_attr is not None:
@@ -111,16 +164,32 @@ def normalize_scrape_result(result: Any) -> ScrapeResult:
         return ScrapeResult(
             files=tuple(_normalize_file(item) for item in files_attr),
             gallery_urls=tuple(str(item) for item in urls_attr if str(item).strip()),
+            size_class=size_class,
+            total_bytes=total_bytes,
+            max_bytes=max_bytes,
         )
     if isinstance(result, (list, tuple)):
         return ScrapeResult(
             files=tuple(_normalize_file(item) for item in result),
             gallery_urls=(),
+            size_class=size_class,
+            total_bytes=total_bytes,
+            max_bytes=max_bytes,
         )
     raise TypeError(f"unsupported scrape result: {type(result)!r}")
 
 
-def files_from_album_root(root: Path) -> Tuple[FileTuple, ...]:
+def files_from_album_root(
+    root: Path,
+    *,
+    load_bytes: bool = True,
+) -> Tuple[FileTuple, ...]:
+    """List album files under ``root``.
+
+    When ``load_bytes`` is False, payloads are empty stubs so callers can inspect
+    relative paths (preview spawn) without holding the album in RAM. Use
+    ``JobStore.materialize_album_tree`` to stream those paths into the store.
+    """
     album = Path(root)
     if not album.is_dir():
         return ()
@@ -129,7 +198,11 @@ def files_from_album_root(root: Path) -> Tuple[FileTuple, ...]:
         if not path.is_file() or path.name in _STATE_NAMES:
             continue
         relpath = path.relative_to(album).as_posix()
-        files.append((relpath, path.read_bytes(), path.stat().st_mtime))
+        mtime = path.stat().st_mtime
+        if load_bytes:
+            files.append((relpath, path.read_bytes(), mtime))
+        else:
+            files.append((relpath, b"", mtime))
     return tuple(files)
 
 

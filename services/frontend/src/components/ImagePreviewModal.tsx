@@ -67,7 +67,10 @@ export function ImagePreviewModal({
   const descriptionLabel = previewDescriptionLabel(target, t)
   const isVideo = previewItemKind(target) === 'video'
   const hasPlayableSrc = target.playable !== false && Boolean(target.src.trim())
-  const showNoBrowserCopy = isVideo && !hasPlayableSrc
+  // Thumb-only edit previews set playable=false with a poster; that is intentional
+  // (avoid hydrating full MP4s), not a missing browser copy.
+  const showNoBrowserCopy =
+    isVideo && !hasPlayableSrc && target.playable !== false && !target.poster
   const showLoadFailed = isVideo && hasPlayableSrc && playFailed
   const statusMessage = showNoBrowserCopy
     ? t.videoPreviewNoBrowserCopy

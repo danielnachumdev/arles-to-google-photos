@@ -76,6 +76,12 @@ class _StoreLike(Protocol):
     ) -> Any:
         ...
 
+    def get(self, job_id: str) -> Any:
+        ...
+
+    def update_extra(self, job_id: str, extra: Optional[Dict[str, Any]]) -> Any:
+        ...
+
 
 SubmitFn = Callable[[str, Callable[[], None]], None]
 EventsEmitFn = Callable[..., Any]
@@ -129,6 +135,7 @@ class MultipartAlbumIngress:
         auto_publish: bool = False,
         access_token: Optional[str] = None,
         owner_id: Optional[str] = None,
+        size_meta: Optional[Dict[str, Any]] = None,
     ) -> str:
         job_id = ""
         for event in self.iter_ingest(
@@ -137,6 +144,7 @@ class MultipartAlbumIngress:
             auto_publish=auto_publish,
             access_token=access_token,
             owner_id=owner_id,
+            size_meta=size_meta,
         ):
             if event.get("event") == "complete":
                 job_id = str(event.get("job_id") or "")
@@ -150,6 +158,7 @@ class MultipartAlbumIngress:
         auto_publish: bool = False,
         access_token: Optional[str] = None,
         owner_id: Optional[str] = None,
+        size_meta: Optional[Dict[str, Any]] = None,
     ) -> Iterator[Dict[str, Any]]:
         """Store parts one-by-one, yield progress, then enqueue preview prep.
 
@@ -166,6 +175,8 @@ class MultipartAlbumIngress:
             owner_id=owner_id,
             title=title,
         )
+        if size_meta:
+            self._apply_size_meta(job_id, size_meta)
         total = len(parts)
         current_rel = ""
         try:
@@ -218,6 +229,30 @@ class MultipartAlbumIngress:
             current=current,
             total=total,
         )
+
+    def _apply_size_meta(self, job_id: str, size_meta: Dict[str, Any]) -> None:
+        from ..export.publish_checkpoint import (
+            SIZE_CLASS_KEY,
+            merge_extra,
+        )
+
+        try:
+            current = self._store.get(job_id)
+            existing = getattr(current, "extra", None)
+        except Exception:
+            existing = None
+        patch = {
+            key: value
+            for key, value in size_meta.items()
+            if key in {SIZE_CLASS_KEY, "total_bytes", "max_bytes"}
+            and value not in (None, "", 0)
+        }
+        if not patch:
+            return
+        try:
+            self._store.update_extra(job_id, merge_extra(existing, patch))
+        except Exception:
+            pass
 
     def _accept_part(self, job_id: str, part: AlbumUploadPart) -> None:
         fd, name = tempfile.mkstemp(prefix="arles-part-", dir=str(self._jobs_root))

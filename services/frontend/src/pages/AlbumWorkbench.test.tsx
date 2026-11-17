@@ -931,7 +931,7 @@ describe('AlbumWorkbench publish sign-in', () => {
     expect(document.querySelector('img.preview-card__thumb')).toBeNull()
   })
 
-  it('opens a video lightbox with play/thumb media URLs from the workbench', async () => {
+  it('opens a video lightbox with thumb poster only (no play hydrate)', async () => {
     const videoItem = PreviewItemBuilder.video().build()
     const videoJob = JobBuilder.preview({
       preview: {
@@ -956,13 +956,15 @@ describe('AlbumWorkbench publish sign-in', () => {
     expect(card?.querySelector('.preview-card__video-badge')?.textContent).toBe(t.videoBadge)
     fireEvent.click(open)
 
-    const video = document.querySelector('video')
-    expect(video).toHaveAttribute('src', `/api/jobs/${videoJob.id}/media/${videoItem.id}?variant=play`)
-    expect(video).toHaveAttribute('poster', `/api/jobs/${videoJob.id}/media/${videoItem.id}?variant=thumb`)
-    expect(video).toHaveAttribute('aria-label', t.videoPreviewAria(videoItem.id))
+    expect(document.querySelector('video')).toBeNull()
+    const poster = document.querySelector('.image-preview-modal__video-poster')
+    expect(poster).toHaveAttribute(
+      'src',
+      `/api/jobs/${videoJob.id}/media/${videoItem.id}?variant=thumb`,
+    )
   })
 
-  it('uses thumb URLs in the grid and original in the image lightbox', async () => {
+  it('uses thumb URLs in the grid and thumb in the image lightbox', async () => {
     const imageItem = PreviewItemBuilder.jpeg().build()
     const imageJob = JobBuilder.preview({
       preview: {
@@ -990,7 +992,7 @@ describe('AlbumWorkbench publish sign-in', () => {
     const lightboxImg = document.querySelector('.image-preview-modal img')
     expect(lightboxImg).toHaveAttribute(
       'src',
-      `/api/jobs/${imageJob.id}/media/${imageItem.id}`,
+      `/api/jobs/${imageJob.id}/media/${imageItem.id}?variant=thumb`,
     )
   })
 

@@ -1,6 +1,7 @@
 """HttpClient strategy double + deterministic clock for scrape ETA tests."""
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Dict, List, Mapping, Tuple
 
 from src.export.scrape.client import FetchedResource
@@ -52,6 +53,51 @@ class FakeHttpClient:
         return FetchedResource(
             url=url,
             status_code=status,
-            headers={"content-type": "application/octet-stream"},
+            headers={
+                "content-type": "application/octet-stream",
+                "content-length": str(len(content)),
+            },
             content=content,
+        )
+
+    def head(self, url: str, headers: Mapping[str, str]) -> FetchedResource:
+        # No delay: size probes must not distort scrape ETA tests.
+        self.calls.append((url, dict(headers)))
+        if url not in self.pages:
+            return FetchedResource(
+                url=url,
+                status_code=404,
+                headers={},
+                content=b"",
+            )
+        status, content = self.pages[url]
+        return FetchedResource(
+            url=url,
+            status_code=status,
+            headers={
+                "content-type": "application/octet-stream",
+                "content-length": str(len(content)),
+            },
+            content=b"",
+        )
+
+    def stream_get_to_path(
+        self,
+        url: str,
+        headers: Mapping[str, str],
+        dest: Path,
+        *,
+        chunk_size: int = 1024 * 1024,
+    ) -> FetchedResource:
+        del chunk_size
+        resource = self.get(url, headers)
+        dest = Path(dest)
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        if resource.status_code == 200 and resource.content:
+            dest.write_bytes(resource.content)
+        return FetchedResource(
+            url=resource.url,
+            status_code=resource.status_code,
+            headers=resource.headers,
+            content=b"",
         )

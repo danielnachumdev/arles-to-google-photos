@@ -14,7 +14,14 @@ from bs4 import BeautifulSoup
 from ...progress import ProgressSink, emit_ops, emit_progress, raise_if_cancelled
 from ..media_kinds import IMAGE_EXTENSIONS, VIDEO_EXTENSIONS, is_video_filename
 from ..video_preview import ensure_local_video_previews
-from .client import FetchError, FetchedResource, HttpClient, UrllibHttpClient
+from ..publish_checkpoint import classify_media_sizes
+from .client import (
+    FetchError,
+    FetchedResource,
+    HttpClient,
+    UrllibHttpClient,
+    content_length_from_headers,
+)
 from .detect import (
     ArlesPageInfo,
     ArlesPageKind,
@@ -175,6 +182,9 @@ class ArlesGalleryScraper:
             total=total,
         )
         kept = 0
+        total_media_bytes = 0
+        max_media_bytes = 0
+        size_class: Optional[str] = None
         for index, item in enumerate(items, start=1):
             raise_if_cancelled(sink)
             tracker.start_item(self._monotonic())
@@ -207,6 +217,31 @@ class ArlesGalleryScraper:
                 )
                 page_html = page.content
                 (pages_dir / f"{item.item_id}.html").write_bytes(page_html)
+            headed = self._head_hr_size(
+                index_url=index_url,
+                page_url=page_url,
+                item=item,
+                page_html=page_html,
+                headers=headers,
+            )
+            if headed is not None:
+                total_media_bytes += int(headed)
+                if headed > max_media_bytes:
+                    max_media_bytes = int(headed)
+                next_class = classify_media_sizes(
+                    total_bytes=total_media_bytes,
+                    max_bytes=max_media_bytes,
+                )
+                if size_class != next_class:
+                    size_class = next_class
+                    _emit_ops(
+                        sink,
+                        f"Size class {size_class} "
+                        f"(max={_format_bytes(max_media_bytes)}, "
+                        f"total={_format_bytes(total_media_bytes)})",
+                        current=index,
+                        total=total,
+                    )
             _emit_ops(
                 sink,
                 f"Downloading hr image {item.item_id}",
@@ -214,12 +249,13 @@ class ArlesGalleryScraper:
                 total=total,
             )
             try:
-                image_bytes, source_name = self._download_hr_image(
+                hr_path, source_name, item_bytes = self._download_hr_image_to_path(
                     index_url=index_url,
                     page_url=page_url,
                     item=item,
                     page_html=page_html,
                     headers=headers,
+                    hr_dir=hr_dir,
                 )
             except ScrapeFetchError:
                 _emit_ops(
@@ -230,11 +266,24 @@ class ArlesGalleryScraper:
                 )
                 continue
             kept += 1
-            hr_name = hr_output_filename(item.item_id, source_name)
-            (hr_dir / hr_name).write_bytes(image_bytes)
+            hr_name = hr_path.name
+            if headed is None:
+                total_media_bytes += int(item_bytes)
+                if item_bytes > max_media_bytes:
+                    max_media_bytes = int(item_bytes)
+                size_class = classify_media_sizes(
+                    total_bytes=total_media_bytes,
+                    max_bytes=max_media_bytes,
+                )
+            elif item_bytes > max_media_bytes:
+                max_media_bytes = int(item_bytes)
+                size_class = classify_media_sizes(
+                    total_bytes=total_media_bytes,
+                    max_bytes=max_media_bytes,
+                )
             _emit_ops(
                 sink,
-                f"GET {hr_name} → 200, {_format_bytes(len(image_bytes))}",
+                f"GET {hr_name} → 200, {_format_bytes(item_bytes)}",
             )
             if is_video_filename(hr_name):
                 self._download_video_poster(
@@ -250,7 +299,7 @@ class ArlesGalleryScraper:
                 )
             snapshot = tracker.finish_item(
                 now=self._monotonic(),
-                item_bytes=len(image_bytes),
+                item_bytes=int(item_bytes),
                 completed=index,
                 total=total,
                 filename=hr_name,
@@ -273,10 +322,18 @@ class ArlesGalleryScraper:
             )
 
         ensure_local_video_previews(output_dir)
+        if size_class is None:
+            size_class = classify_media_sizes(
+                total_bytes=total_media_bytes,
+                max_bytes=max_media_bytes,
+            )
         return ScrapeResult(
             album_root=output_dir,
             child_gallery_urls=child_urls,
             gallery_title=info.gallery_title,
+            size_class=size_class,
+            total_media_bytes=int(total_media_bytes),
+            max_media_bytes=int(max_media_bytes),
         )
 
     def _gallery_arl_exists(self, index_url: str, headers: Mapping[str, str]) -> bool:
@@ -394,7 +451,7 @@ class ArlesGalleryScraper:
         ordered = [items_by_id[item_id] for item_id in ordered_ids]
         return ordered, extra_ids, index_bytes
 
-    def _download_hr_image(
+    def _head_hr_size(
         self,
         *,
         index_url: str,
@@ -402,7 +459,11 @@ class ArlesGalleryScraper:
         item: GalleryItemRef,
         page_html: bytes,
         headers: Mapping[str, str],
-    ) -> Tuple[bytes, str]:
+    ) -> Optional[int]:
+        """Best-effort Content-Length via HEAD before streaming the body."""
+        head_fn = getattr(self._client, "head", None)
+        if not callable(head_fn):
+            return None
         candidates = image_candidate_urls(
             index_url=index_url,
             page_url=page_url,
@@ -410,10 +471,60 @@ class ArlesGalleryScraper:
             page_html=page_html,
         )
         for url in candidates:
+            try:
+                resource = head_fn(url, headers)
+            except FetchError:
+                continue
+            if int(getattr(resource, "status_code", 400)) >= 400:
+                continue
+            size = content_length_from_headers(getattr(resource, "headers", {}) or {})
+            if size is not None and size > 0:
+                return int(size)
+        return None
+
+    def _download_hr_image_to_path(
+        self,
+        *,
+        index_url: str,
+        page_url: str,
+        item: GalleryItemRef,
+        page_html: bytes,
+        headers: Mapping[str, str],
+        hr_dir: Path,
+    ) -> Tuple[Path, str, int]:
+        """Stream HR media to ``hrimages/`` without buffering the whole body in RAM."""
+        candidates = image_candidate_urls(
+            index_url=index_url,
+            page_url=page_url,
+            item=item,
+            page_html=page_html,
+        )
+        stream_fn = getattr(self._client, "stream_get_to_path", None)
+        for url in candidates:
+            source_name = _filename_from_url(url)
+            hr_name = hr_output_filename(item.item_id, source_name)
+            dest = hr_dir / hr_name
+            if callable(stream_fn):
+                try:
+                    resource = stream_fn(url, headers, dest)
+                except FetchError:
+                    if dest.exists():
+                        dest.unlink(missing_ok=True)
+                    continue
+                if int(getattr(resource, "status_code", 400)) != 200 or not dest.is_file():
+                    if dest.exists():
+                        dest.unlink(missing_ok=True)
+                    continue
+                size = int(dest.stat().st_size)
+                if size <= 0:
+                    dest.unlink(missing_ok=True)
+                    continue
+                return dest, source_name, size
             resource = self._try_get(url, headers)
             if resource is None:
                 continue
-            return resource.content, _filename_from_url(url)
+            dest.write_bytes(resource.content)
+            return dest, source_name, len(resource.content)
         raise ScrapeFetchError(
             f"No full-size image found for {item.item_id} (tried {len(candidates)} URLs)",
             url=page_url,

@@ -29,7 +29,8 @@ import { withGooglePhotosAccessToken } from '../lib/withGooglePhotosToken.ts'
 import { isJobCancellable } from '../lib/formatJobDuration.ts'
 import { jobStatusLabel, jobTypeLabel, t } from '../lib/language.ts'
 import { computePreviewDirty } from '../lib/previewDirty.ts'
-import { previewItemKind, videoHasBrowserPlayableCopy } from '../lib/previewMedia.ts'
+import { previewItemKind } from '../lib/previewMedia.ts'
+import { albumSizeStats } from '../lib/sizeClass.ts'
 import { isLifecycleJobEvent, isOpsJobEvent, jobLogMessage } from '../lib/jobLogs.ts'
 import { announceRunSubmitted, kindFromJobType, trackRun } from '../lib/runTracker.ts'
 import { toast } from '../lib/toast.ts'
@@ -418,15 +419,29 @@ export function AlbumWorkbench({
 
   async function uploadPreview(payload: ReturnType<typeof jobFilesFromDirectory>, overwrite = false) {
     const pending = pendingImportRef.current
+    const sizes = albumSizeStats(payload)
+    if (sizes.exceedsHardCeiling) {
+      const maxLabel = `${(sizes.maxBytes / (1024 * 1024 * 1024)).toFixed(1)} GiB`
+      setError(t.albumFileTooLarge(maxLabel))
+      setPhase('failed')
+      return
+    }
     setPhase('working')
     setError(null)
     setUploadProgress({ phase: 'upload', loaded: 0, total: 0, percent: 0 })
-    setStatusLine(t.sendingFiles(payload.length))
+    setStatusLine(
+      sizes.sizeClass === 'large'
+        ? `${t.largeAlbumNotice} ${t.sendingFiles(payload.length)}`
+        : t.sendingFiles(payload.length),
+    )
     try {
       const created = await client.createJob(payload, {
         ...(overwrite ? { overwrite: true } : {}),
         autoPublish: pending?.autoPublish,
         accessToken: pending?.accessToken,
+        sizeClass: sizes.sizeClass,
+        totalBytes: sizes.totalBytes,
+        maxBytes: sizes.maxBytes,
         onUploadProgress: (event) => {
           setUploadProgress({ phase: 'upload', ...event })
           setStatusLine(
@@ -1029,25 +1044,21 @@ export function AlbumWorkbench({
                   showDateMismatch={inferImportOrigin(job) === 'folder'}
                   onCaption={(value) => setCaptions((prev) => ({ ...prev, [item.id]: value }))}
                   onOpenPreview={() => {
-                    const playable = kind !== 'video' || videoHasBrowserPlayableCopy(item)
+                    // Thumb-only lightbox: never hydrate hrimages/ or full play
+                    // MP4s during edit (Cloud Run memory ceiling is per-file).
+                    const thumb =
+                      kind === 'video' && !item.thumb_relpath
+                        ? ''
+                        : client.mediaUrl(job.id, item.id, 'thumb')
                     setPreviewTarget({
                       id: item.id,
                       index: index + 1,
-                      src:
-                        kind === 'video'
-                          ? playable
-                            ? client.mediaUrl(job.id, item.id, 'play')
-                            : ''
-                          : client.mediaUrl(job.id, item.id, 'original'),
+                      src: kind === 'video' ? '' : thumb,
                       caption: captions[item.id] ?? item.caption,
                       kind,
                       relpath: item.relpath,
-                      playable: kind === 'video' ? playable : undefined,
-                      poster: item.thumb_relpath
-                        ? client.mediaUrl(job.id, item.id, 'thumb')
-                        : kind === 'video'
-                          ? null
-                          : client.mediaUrl(job.id, item.id, 'thumb'),
+                      playable: kind === 'video' ? false : undefined,
+                      poster: thumb || null,
                     })
                   }}
                 />

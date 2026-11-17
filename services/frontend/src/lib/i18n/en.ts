@@ -374,6 +374,10 @@ export const en: MessageCatalog = {
     'Could not load the video preview. Try again later, or publish — the original file is unchanged.',
   videoPreviewUnavailable:
     'Could not load the video preview. Try again later, or publish — the original file is unchanged.',
+  largeAlbumNotice:
+    'Large album: publish uploads one file at a time and can resume if interrupted.',
+  albumFileTooLarge: (maxLabel) =>
+    `This album has a file larger than ${maxLabel}, which exceeds the Cloud Run publish limit. Split or compress that file, then try again.`,
 
   close: 'Close',
   toastDismissAria: 'Dismiss notification',

@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Callable, Optional, Tuple
 
 from .media_kinds import KIND_VIDEO, infer_item_kind, is_video_filename
+from .photos_upload import sparse_local_file
 from .preview import PreviewItem
 from .video_preview import try_transcode_to_mp4
 
@@ -18,9 +19,12 @@ class PublishMediaPreparer:
     """Resolve upload bytes for one preview item.
 
     Non-MP4 videos must become a real (non-empty) ``.mp4`` before
-    ``gpsdk`` / Photos see them. On Cloud Run, ``play_relpath`` often
-    exists as a 0-byte sparse placeholder — this class hydrates it via
-    ``resolve`` instead of copying emptiness into the sibling companion.
+    Photos sees them. On Cloud Run, ``play_relpath`` often exists as a
+    0-byte sparse placeholder — this class hydrates it via ``resolve``
+    instead of copying emptiness into the sibling companion.
+
+    After a companion MP4 is ready, the original non-MP4 source is
+    re-sparsed so hydrate + companion are not both full on disk.
     """
 
     def __init__(self, *, transcode: Optional[TranscodeFn] = None) -> None:
@@ -50,7 +54,11 @@ class PublishMediaPreparer:
             )
         if not self._needs_mp4_companion(item, source):
             return source
-        return self._prepare_video_mp4(item, source, resolve=resolve)
+        companion = self._prepare_video_mp4(item, source, resolve=resolve)
+        # Free the hydrated original once the uploadable MP4 exists.
+        if companion.resolve() != source.resolve():
+            sparse_local_file(source)
+        return companion
 
     def _needs_mp4_companion(self, item: PreviewItem, source: Path) -> bool:
         if source.suffix.lower() == ".mp4":

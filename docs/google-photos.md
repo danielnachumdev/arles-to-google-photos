@@ -73,7 +73,8 @@ The UI loads config from `GET /api/auth/config` (`client_id` + scopes only). The
 1. Finish a preview and click **Publish** (or check **Auto-publish** when starting an import).
 2. The first time, Google’s popup asks you to sign in and allow Photos access. Later publishes reuse that browser session until the token expires (or Google returns 401).
 3. The app sends the access token with the publish request. A **new upload job** starts; the preview job stays as-is.
-4. When the upload finishes, open the Google Photos album link.
+4. Bytes are staged in the artifact store first ([persistence](persistence.md#gcs-as-staging-not-google-photos)); publish streams each media body to Photos (`POST …/v1/uploads`) then `batchCreate`s media items. Large albums are sequential and **resumable** via per-item checkpoints on the upload job.
+5. When the upload finishes, open the Google Photos album link.
 
 If the popup is closed or denied, sign-in is cancelled and nothing is uploaded. Use **Settings → Sign out of Google Photos** to clear the saved browser session.
 
@@ -88,7 +89,7 @@ After scopes change (for example adding `readonly.appcreateddata`), clear the br
 - Items in gallery order
 - Capture times stamped before upload (JPEG EXIF + file times) so Photos sorts by the trip date. See [Album layout](album-layout.md#dates).
 
-Each **Publish** / **Publish again** creates a new independent Photos album. Overwriting a stored preview on this server does **not** change or republish Google Photos.
+Each **Publish** / **Publish again** creates a new independent Photos album. Overwriting a stored preview on this server does **not** change or republish Google Photos. A **remaining-mode** restart of a failed/cancelled upload continues the same Photos album when checkpoints and album id are still on the job.
 
 ## Next
 
