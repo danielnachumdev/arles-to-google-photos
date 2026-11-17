@@ -34,12 +34,17 @@ COPY --from=builder /app/src /app/src
 COPY alembic.ini /app/alembic.ini
 COPY alembic /app/alembic
 
+# Semver baked at CD (Waymark-style). Empty → package ``__version__`` for local builds.
+ARG ARLES_VERSION=
 # Build stamp: pass --build-arg BUILD_TIME=... or default to UTC now at build.
 # Dockerfile cannot ENV=now(); stamp is written to /etc/arles-build-time for the API.
 ARG BUILD_TIME=
 RUN stamp="$BUILD_TIME"; \
     if [ -z "$stamp" ]; then stamp="$(date -u +%Y-%m-%dT%H:%M:%SZ)"; fi; \
     printf '%s' "$stamp" > /etc/arles-build-time
+
+ENV ARLES_VERSION=${ARLES_VERSION} \
+    BUILD_TIME=${BUILD_TIME}
 
 # gp_wrapper.GooglePhotos() defaults to ./client_secrets.json under WORKDIR.
 # Mount credentials at runtime (see docker-compose.yml). Do not bake secrets into the image.

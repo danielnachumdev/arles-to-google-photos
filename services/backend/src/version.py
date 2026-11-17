@@ -20,4 +20,12 @@ def _resolve_build_time() -> str:
         return ""
 
 
+def resolved_version() -> str:
+    """CD-baked ``ARLES_VERSION`` / ``APP_VERSION`` wins; else package ``__version__``."""
+    baked = (
+        os.environ.get("ARLES_VERSION") or os.environ.get("APP_VERSION") or ""
+    ).strip()
+    return baked if baked else __version__
+
+
 BUILD_TIME = _resolve_build_time()

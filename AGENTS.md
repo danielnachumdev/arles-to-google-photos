@@ -161,20 +161,22 @@ Preview JSON includes `journal`, `taken_on` (ISO date or null), `last_modified`,
 
 - **Backend:** from `services/backend`, `uv run pytest` (pythonpath `.`; quiet + `-n auto` + `src` coverage with missing lines). Fixture trees: `tests/fixtures/day1_mini` and `tests/fixtures/day1_arles`.
 - **Frontend:** from `services/frontend`, `npm test` (vitest) and `npx tsc -b`.
-- **CI:** thin orchestrator `.github/workflows/ci.yml` on PRs and pushes to `main` — Backend + Frontend jobs via [`danielnachumdev/actions`](https://github.com/danielnachumdev/actions) (`ci.yml@latest`), then aggregate job **`CI`**. No Semver (non-publisher app).
+- **CI:** thin orchestrator `.github/workflows/ci.yml` on PRs and pushes to `main` — Backend + Frontend via [`danielnachumdev/actions`](https://github.com/danielnachumdev/actions) (`ci.yml@latest`), aggregate **`CI`**, plus **`semver-ci`** on PRs.
+- **CD:** `.github/workflows/cd.yml` after successful CI on `main` — `semver-cd` (bump → wheel → GitHub Release → `retags: ["latest"]`) then GHCR image build/push with baked **`ARLES_VERSION`** + **`BUILD_TIME`** (Waymark pattern). Images: `ghcr.io/danielnachumdev/arles-migrator-backend` / `…-frontend` (`:sha`, `:main`, `:latest`).
 
 ## PRs and CI
 
 1. Branch off `main`; open a PR into `main`.
-2. **CI** — Backend (uv pytest) + Frontend (npm test / `tsc`) + aggregate **`CI`**. Prefer requiring **`CI`**.
-3. This app is **not** a Semver publisher — no bump labels, no `semver-ci` / `semver-cd`.
-4. Dependabot auto-merges when aggregate **`CI`** succeeds (`always()` + `needs.ci.result == 'success'`).
-5. Change shared CI / Dependabot-auto-merge behavior in **`danielnachumdev/actions`**, not by re-vendoring here. How to adopt: [`HOW-TO-USE.md`](https://github.com/danielnachumdev/actions/blob/v1/HOW-TO-USE.md).
+2. Attach **exactly one** semver label: `noBump` | `bumpPatch` | `bumpMinor` | `bumpMajor` (docs-only / Dependabot → `noBump`).
+3. **CI** — Backend + Frontend + aggregate **`CI`** + **`Semver / Semver`**. Prefer requiring both.
+4. **CD** (on `main` after CI) — stamps `services/backend` + `services/frontend` versions, releases, retags `latest`, bakes version into Docker images. UI `/api/version` prefers env `ARLES_VERSION` over package `__version__`.
+5. Dependabot auto-merges when **`CI`** and **Semver** succeed.
+6. Change shared CI / Semver / Dependabot-auto-merge behavior in **`danielnachumdev/actions`**, not by re-vendoring here. How to adopt: [`HOW-TO-USE.md`](https://github.com/danielnachumdev/actions/blob/v1/HOW-TO-USE.md).
 
 ### Repo gates (already configured)
 
 - `.github/CODEOWNERS` — `@danielnachumdev`
-- Branch protection / ruleset: required **`CI`**; code-owner reviews; no force-push to `main`
+- Branch protection / ruleset: required **`CI`** (add **`Semver / Semver`** when ready); code-owner reviews; no force-push to `main`
 - `.github/ISSUE_TEMPLATE/` — feature request (Background / Motivation / Requirements / AC); bug report (Description / Steps to reproduce / Expected / Actual / Environment)
 
 ## Code conventions
