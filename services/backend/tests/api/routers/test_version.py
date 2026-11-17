@@ -16,8 +16,8 @@ def test_get_version(tmp_path: Path) -> None:
         "version": resolved_version(),
         "build_time": BUILD_TIME or None,
     }
-    assert __version__ == "1.0.0"
-    assert resolved_version() == "1.0.0"
+    assert __version__ == "1.4.0"
+    assert resolved_version() == "1.4.0"
 
 
 def test_get_version_prefers_baked_arles_version(
